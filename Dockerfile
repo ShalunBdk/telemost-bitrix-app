@@ -18,8 +18,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Копируем все файлы приложения
 COPY . .
 
-# Создаем директорию для логов
-RUN mkdir -p logs
+# Создаем директории для данных и логов
+RUN mkdir -p data logs
 
 # Создаем пользователя для запуска приложения (безопасность)
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
