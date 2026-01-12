@@ -49,9 +49,11 @@ def create_app():
             self.prefix = prefix.rstrip('/')
 
         def __call__(self, environ, start_response):
+            original_path = environ['PATH_INFO']
             if self.prefix and environ['PATH_INFO'].startswith(self.prefix):
                 environ['PATH_INFO'] = environ['PATH_INFO'][len(self.prefix):]
-                environ['SCRIPT_NAME'] = self.prefix
+                environ['SCRIPT_NAME'] = environ.get('SCRIPT_NAME', '') + self.prefix
+                app.logger.debug(f'PrefixMiddleware: {original_path} → {environ["PATH_INFO"]}')
             return self.app(environ, start_response)
 
     # Применяем middleware если указан BASE_PATH
@@ -623,15 +625,6 @@ def create_app():
             'service': 'telemost-bitrix-app',
             'base_path': app.config.get('BASE_PATH', '')
         }), 200
-
-    # Error handlers
-    @app.errorhandler(404)
-    def not_found(error):
-        return render_template('404.html'), 404
-
-    @app.errorhandler(500)
-    def internal_error(error):
-        return render_template('500.html'), 500
 
     return app
 

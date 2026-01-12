@@ -4,9 +4,12 @@ FROM python:3.11-slim
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Устанавливаем системные зависимости
+# Устанавливаем системные зависимости (Node.js для сборки CSS)
 RUN apt-get update && apt-get install -y \
     gcc \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Копируем файл зависимостей
@@ -15,8 +18,18 @@ COPY requirements.txt .
 # Устанавливаем Python зависимости
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Копируем package.json и устанавливаем Node.js зависимости
+COPY package*.json ./
+RUN npm ci
+
 # Копируем все файлы приложения
 COPY . .
+
+# Собираем CSS с помощью Tailwind
+RUN npm run build:css
+
+# Удаляем node_modules чтобы уменьшить размер образа
+RUN rm -rf node_modules
 
 # Создаем директории для данных и логов
 RUN mkdir -p data logs
