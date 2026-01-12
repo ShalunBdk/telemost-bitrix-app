@@ -15,7 +15,6 @@ services:
 
       # Base path for reverse proxy (доступ через /telemost-bitrix)
       - BASE_PATH=/telemost-bitrix
-      - SCRIPT_NAME=/telemost-bitrix
 
       # Bitrix24 settings
       - BITRIX24_CLIENT_ID=${BITRIX24_CLIENT_ID}
