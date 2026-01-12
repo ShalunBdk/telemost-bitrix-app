@@ -8,7 +8,7 @@ class Config:
 
     # Base path for reverse proxy (e.g., /telemost-bitrix)
     BASE_PATH = os.environ.get('BASE_PATH', '').rstrip('/')
-    APPLICATION_ROOT = os.environ.get('SCRIPT_NAME', '').rstrip('/')
+    APPLICATION_ROOT = BASE_PATH or '/'
     
     # Bitrix24 Configuration
     BITRIX24_CLIENT_ID = os.environ.get('BITRIX24_CLIENT_ID')
