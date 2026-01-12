@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html class="light" lang="ru">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Настройки бота - Панель администратора</title>
+
+    <link href="{{ url_for('static', filename='css/output.css') }}" rel="stylesheet"/>
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+
+    <style>
+        .wysiwyg-editor {
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            height: auto !important;
+        }
+        .wysiwyg-editor .ql-toolbar {
+            border: none;
+            border-bottom: 2px solid #dee2e6;
+            background: #f8f9fa;
+            padding: 8px;
+        }
+        .wysiwyg-editor .ql-container {
+            border: none;
+            font-size: 16px;
+            font-family: inherit;
+            height: 150px;
+        }
+        .wysiwyg-editor .ql-editor {
+            height: 150px;
+            padding: 12px;
+            line-height: 1.6;
+            overflow-y: auto;
+        }
+
+        /* Для длинного приветственного сообщения */
+        #start_message_editor .ql-container,
+        #start_message_editor .ql-editor {
+            height: 180px;
+        }
+
+        /* Для коротких ответов на обратную связь */
+        #feedback_response_yes_editor .ql-container,
+        #feedback_response_no_editor .ql-container,
+        #feedback_response_yes_editor .ql-editor,
+        #feedback_response_no_editor .ql-editor {
+            height: 100px;
+        }
+
+        .wysiwyg-editor .ql-editor.ql-blank::before {
+            color: #adb5bd;
+            font-style: normal;
+        }
+        .wysiwyg-editor:focus-within {
+            border-color: #3498db;
+        }
+
+        /* Скрываем textarea для WYSIWYG редактора */
+        .wysiwyg-source {
+            display: none !important;
+        }
+
+        /* Telegram Preview */
+        .telegram-message {
+            background: #2481cc;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 12px 12px 12px 4px;
+            max-width: 85%;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            font-size: 15px;
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+        .telegram-message strong { font-weight: bold; }
+        .telegram-message em { font-style: italic; }
+        .telegram-message code {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+
+        .telegram-button {
+            background: white;
+            color: #2481cc;
+            padding: 10px 16px;
+            border-radius: 8px;
+            display: inline-block;
+            font-weight: 500;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            min-width: 120px;
+        }
+
+        /* Стили для сворачивающегося сайдбара */
+        .sidebar-expanded {
+            width: 16rem; /* 256px / w-64 */
+        }
+
+        .sidebar-collapsed {
+            width: 4.5rem; /* 72px - достаточно для иконок с padding */
+        }
+
+        .sidebar-collapsed .sidebar-text {
+            display: none;
+        }
+
+        /* Плавный переход для текста */
+        .sidebar-text {
+            transition: opacity 0.2s ease-in-out;
+        }
+
+        .sidebar-collapsed .sidebar-text {
+            opacity: 0;
+        }
+
+        /* Центрирование header сайдбара когда он свёрнут */
+        #sidebar.sidebar-collapsed > div > div:first-child > div:first-child {
+            justify-content: center !important;
+        }
+
+        /* Центрирование навигации когда сайдбар свёрнут */
+        #sidebar.sidebar-collapsed nav a {
+            justify-content: center !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+        }
+    </style>
+</head>
+
+<body class="font-display bg-background-light dark:bg-background-dark text-[#1F2937] dark:text-gray-200">
+<div class="flex min-h-screen">
+    
+    <aside id="sidebar" class="sidebar-expanded bg-white dark:bg-[#182431] border-r border-gray-200 dark:border-gray-700 p-4 transition-all duration-300">
+        <div class="flex flex-col h-full">
+            <div class="mb-6">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="bg-primary rounded-lg size-10 flex items-center justify-center flex-shrink-0">
+                        <span class="material-symbols-outlined text-white">support_agent</span>
+                    </div>
+                    <h1 class="sidebar-text text-lg font-bold text-gray-800 dark:text-white whitespace-nowrap overflow-hidden">Админ-панель</h1>
+                </div>
+                <button onclick="toggleSidebar()" class="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" title="Свернуть/развернуть меню">
+                    <span class="material-symbols-outlined text-gray-600 dark:text-gray-400 text-xl">menu</span>
+                    <span class="sidebar-text text-sm font-medium text-gray-600 dark:text-gray-400">Свернуть меню</span>
+                </button>
+            </div>
+
+            <nav class="flex flex-col gap-2 flex-grow">
+                <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors" href="{{ config.get('BASE_PATH', '') }}/admin/" title="База знаний">
+                    <span class="material-symbols-outlined text-gray-600 dark:text-gray-400 flex-shrink-0">import_contacts</span>
+                    <p class="sidebar-text text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal whitespace-nowrap overflow-hidden">База знаний</p>
+                </a>
+                <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors" href="{{ config.get('BASE_PATH', '') }}/admin/logs" title="Логи">
+                    <span class="material-symbols-outlined text-gray-600 dark:text-gray-400 flex-shrink-0">receipt_long</span>
+                    <p class="sidebar-text text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal whitespace-nowrap overflow-hidden">Логи</p>
+                </a>
+                <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors" href="{{ config.get('BASE_PATH', '') }}/admin/test-periods" title="Тестирование">
+                    <span class="material-symbols-outlined text-gray-600 dark:text-gray-400 flex-shrink-0">science</span>
+                    <p class="sidebar-text text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal whitespace-nowrap overflow-hidden">Тестирование</p>
+                </a>
+                <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors" href="{{ config.get('BASE_PATH', '') }}/admin/permissions" title="Права доступа">
+                    <span class="material-symbols-outlined text-gray-600 dark:text-gray-400 flex-shrink-0">admin_panel_settings</span>
+                    <p class="sidebar-text text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal whitespace-nowrap overflow-hidden">Права доступа</p>
+                </a>
+                <a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/20 dark:bg-primary/30 text-primary dark:text-white" href="{{ config.get('BASE_PATH', '') }}/admin/settings" title="Настройки">
+                    <span class="material-symbols-outlined fill flex-shrink-0">settings</span>
+                    <p class="sidebar-text text-sm font-bold leading-normal whitespace-nowrap overflow-hidden">Настройки</p>
+                </a>
+            </nav>
+        </div>
+    </aside>
+
+    
+    <main class="flex-1 p-6 lg:p-10">
+        <div class="max-w-5xl mx-auto">
+            
+            <div class="flex flex-wrap justify-between items-center gap-4 mb-8">
+                <div class="flex flex-col gap-1">
+                    <h1 class="text-gray-800 dark:text-white text-3xl font-bold leading-tight">Настройки бота</h1>
+                    <p class="text-gray-500 dark:text-gray-400 text-base font-normal leading-normal">Управление текстами и сообщениями Telegram-бота.</p>
+                </div>
+            </div>
+
+            
+            <div id="loadingIndicator" class="text-center py-12 text-primary">
+                <span class="material-symbols-outlined text-4xl animate-spin inline-block mb-2">refresh</span>
+                <p>Загрузка настроек...</p>
+            </div>
+
+            
+            <form id="settingsForm" class="space-y-6" style="display: none;">
+                
+                <div class="bg-white dark:bg-[#182431] rounded-xl shadow-md border border-gray-200 dark:border-gray-700 p-6">
+                    <h3 class="text-gray-800 dark:text-white text-xl font-bold mb-2 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary">waving_hand</span>
+                        Приветственное сообщение (/start)
+                    </h3>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mb-4">
+                        Это сообщение видят пользователи при нажатии на команду /start или /help. Используйте панель инструментов для форматирования текста.
+                    </p>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Текст приветствия:</label>
+                            <textarea id="start_message" class="wysiwyg-source" required></textarea>
+                            <div id="start_message_editor" class="wysiwyg-editor"></div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Предпросмотр в Telegram:</label>
+                            <div class="bg-gray-100 dark:bg-gray-700/50 rounded-lg p-4 min-h-[180px]">
+                                <div class="telegram-message">
+                                    <div id="start_message_preview"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Кнопка "Полезно" -->
+                <div class="bg-white dark:bg-[#182431] rounded-xl shadow-md border border-gray-200 dark:border-gray-700 p-6">
+                    <h3 class="text-gray-800 dark:text-white text-xl font-bold mb-2 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-green-500 fill">thumb_up</span>
+                        Кнопка обратной связи "Полезно"
+                    </h3>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mb-4">
+                        Текст кнопки, которая появляется под ответами бота.
+                    </p>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Текст кнопки:</label>
+                            <input type="text" id="feedback_button_yes" required class="form-input w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Предпросмотр в Telegram:</label>
+                            <div class="bg-gray-100 dark:bg-gray-700/50 rounded-lg p-4">
+                                <div class="telegram-button" id="feedback_button_yes_preview"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Кнопка "Не помогло" -->
+                <div class="bg-white dark:bg-[#182431] rounded-xl shadow-md border border-gray-200 dark:border-gray-700 p-6">
+                    <h3 class="text-gray-800 dark:text-white text-xl font-bold mb-2 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-red-500 fill">thumb_down</span>
+                        Кнопка обратной связи "Не помогло"
+                    </h3>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mb-4">
+                        Текст кнопки для негативного отзыва.
+                    </p>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Текст кнопки:</label>
+                            <input type="text" id="feedback_button_no" required class="form-input w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Предпросмотр в Telegram:</label>
+                            <div class="bg-gray-100 dark:bg-gray-700/50 rounded-lg p-4">
+                                <div class="telegram-button" id="feedback_button_no_preview"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ответ на "Полезно" -->
+                <div class="bg-white dark:bg-[#182431] rounded-xl shadow-md border border-gray-200 dark:border-gray-700 p-6">
+                    <h3 class="text-gray-800 dark:text-white text-xl font-bold mb-2 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-green-500 fill">check_circle</span>
+                        Ответ на положительный отзыв
+                    </h3>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mb-4">
+                        Сообщение, которое видит пользователь после нажатия на кнопку "Полезно".
+                    </p>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Текст ответа:</label>
+                            <textarea id="feedback_response_yes" class="wysiwyg-source" required></textarea>
+                            <div id="feedback_response_yes_editor" class="wysiwyg-editor"></div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Предпросмотр в Telegram:</label>
+                            <div class="bg-gray-100 dark:bg-gray-700/50 rounded-lg p-4">
+                                <div class="telegram-message">
+                                    <div id="feedback_response_yes_preview"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ответ на "Не помогло" -->
+                <div class="bg-white dark:bg-[#182431] rounded-xl shadow-md border border-gray-200 dark:border-gray-700 p-6">
+                    <h3 class="text-gray-800 dark:text-white text-xl font-bold mb-2 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-red-500 fill">cancel</span>
+                        Ответ на негативный отзыв
+                    </h3>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mb-4">
+                        Сообщение, которое видит пользователь после нажатия на кнопку "Не помогло". Здесь можно указать контакты для дополнительной помощи.
+                    </p>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Текст ответа:</label>
+                            <textarea id="feedback_response_no" class="wysiwyg-source" required></textarea>
+                            <div id="feedback_response_no_editor" class="wysiwyg-editor"></div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Предпросмотр в Telegram:</label>
+                            <div class="bg-gray-100 dark:bg-gray-700/50 rounded-lg p-4">
+                                <div class="telegram-message">
+                                    <div id="feedback_response_no_preview"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Каскадный поиск -->
+                <div class="space-y-3 mt-6">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary">layers</span>
+                        Настройки каскадного поиска
+                    </h3>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mb-4">
+                        Пороговые значения для разных уровней поиска. Каскадный поиск использует 3 уровня: точное совпадение → ключевые слова → семантический AI-поиск.
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Exact Match Threshold -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <span class="flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-sm">target</span>
+                                    Порог точного совпадения (%)
+                                </span>
+                            </label>
+                            <input type="number" id="exact_match_threshold" min="90" max="100" step="1" value="95" class="form-input w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                            <p class="text-xs text-gray-500 mt-1">Рекомендуется: 95. Уровень 1: Точное совпадение вопроса.</p>
+                        </div>
+
+                        <!-- Keyword Match Threshold -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <span class="flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-sm">key</span>
+                                    Порог поиска по ключевым словам (%)
+                                </span>
+                            </label>
+                            <input type="number" id="keyword_match_threshold" min="60" max="95" step="1" value="65" class="form-input w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                            <p class="text-xs text-gray-500 mt-1">Рекомендуется: 65-70. Уровень 2: Поиск по совпадению ключевых слов.</p>
+                        </div>
+
+                        <!-- Semantic Match Threshold -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <span class="flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-sm">psychology</span>
+                                    Порог семантического поиска (%)
+                                </span>
+                            </label>
+                            <input type="number" id="semantic_match_threshold" min="30" max="80" step="5" value="45" class="form-input w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                            <p class="text-xs text-gray-500 mt-1">Рекомендуется: 45. Уровень 3: Семантический AI-поиск.</p>
+                        </div>
+
+                        <!-- Keyword Search Max Words -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <span class="flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-sm">article</span>
+                                    Макс. слов для keyword search
+                                </span>
+                            </label>
+                            <input type="number" id="keyword_search_max_words" min="3" max="10" step="1" value="5" class="form-input w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                            <p class="text-xs text-gray-500 mt-1">Рекомендуется: 5. Если запрос длиннее, keyword search пропускается.</p>
+                        </div>
+                    </div>
+
+                    <!-- Show Similarity Toggle -->
+                    <div class="mt-4">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" id="show_similarity" class="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <span class="flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-sm">percent</span>
+                                    Показывать процент схожести в ответах
+                                </span>
+                            </span>
+                        </label>
+                        <p class="text-xs text-gray-500 mt-1 ml-8">Если включено, в ответах бота будет показана иконка уровня и процент схожести (например: 🧠 Совпадение: 75%)</p>
+                    </div>
+
+                    <!-- Fallback Message -->
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <span class="flex items-center gap-1">
+                                <span class="material-symbols-outlined text-sm">error</span>
+                                Сообщение при отсутствии ответа
+                            </span>
+                        </label>
+                        <textarea id="fallback_message" rows="4" class="form-input w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"></textarea>
+                        <p class="text-xs text-gray-500 mt-1">Сообщение, которое увидит пользователь, если ничего не найдено на всех уровнях поиска.</p>
+                    </div>
+
+                    <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-4">
+                        <p class="text-sm text-blue-900 dark:text-blue-200">
+                            <strong>ℹ️ Как работает каскадная система:</strong>
+                        </p>
+                        <ol class="text-sm text-blue-800 dark:text-blue-300 mt-2 ml-4 list-decimal space-y-1">
+                            <li><strong>Уровень 1:</strong> Ищем точное совпадение вопроса (самый быстрый)</li>
+                            <li><strong>Уровень 2:</strong> Ищем по ключевым словам (только для коротких запросов)</li>
+                            <li><strong>Уровень 3:</strong> Семантический AI-поиск (самый умный, но медленный)</li>
+                            <li><strong>Уровень 4:</strong> Показываем fallback-сообщение если ничего не найдено</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <!-- Действия -->
+                <div class="flex gap-3 justify-end pt-4">
+                    <button type="button" onclick="resetSettings()" class="flex items-center gap-2 px-5 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors">
+                        <span class="material-symbols-outlined">restart_alt</span>
+                        <span>Сбросить к умолчаниям</span>
+                    </button>
+                    <button type="submit" class="flex items-center gap-2 px-5 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                        <span class="material-symbols-outlined">save</span>
+                        <span>Сохранить изменения</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </main>
+</div>
+
+<script>
+    // Базовый URL для API запросов (с учетом BASE_PATH для reverse proxy)
+    const BASE_URL = '{{ config.get("BASE_PATH", "") }}/admin';
+    const editors = {};
+
+    // ========== ФУНКЦИИ ДЛЯ САЙДБАРА ==========
+
+    // Переключение состояния сайдбара (свернут/развернут)
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const isExpanded = sidebar.classList.contains('sidebar-expanded');
+
+        if (isExpanded) {
+            sidebar.classList.remove('sidebar-expanded');
+            sidebar.classList.add('sidebar-collapsed');
+            localStorage.setItem('sidebarState', 'collapsed');
+        } else {
+            sidebar.classList.remove('sidebar-collapsed');
+            sidebar.classList.add('sidebar-expanded');
+            localStorage.setItem('sidebarState', 'expanded');
+        }
+    }
+
+    // Восстановление состояния сайдбара при загрузке страницы
+    function restoreSidebarState() {
+        const savedState = localStorage.getItem('sidebarState');
+        if (savedState === 'collapsed') {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.remove('sidebar-expanded');
+            sidebar.classList.add('sidebar-collapsed');
+        }
+    }
+
+    // Вызываем при загрузке страницы
+    restoreSidebarState();
+
+    // ========== КОНЕЦ ФУНКЦИЙ ДЛЯ САЙДБАРА ==========
+
+    // Конвертация Quill HTML в Telegram HTML
+    function convertQuillToTelegramHtml(html) {
+        html = html.replace(/<strong>/g, '<b>');
+        html = html.replace(/<\/strong>/g, '</b>');
+        html = html.replace(/<em>/g, '<i>');
+        html = html.replace(/<\/em>/g, '</i>');
+        html = html.replace(/<pre class="ql-syntax"[^>]*>/g, '<code>');
+        html = html.replace(/<\/pre>/g, '</code>');
+        html = html.replace(/<p><br><\/p>/g, '\n');
+        html = html.replace(/<p>/g, '');
+        html = html.replace(/<\/p>/g, '\n');
+        html = html.replace(/<br>/g, '\n');
+        html = html.replace(/<br\/>/g, '\n');
+        html = html.replace(/<br \/>/g, '\n');
+        html = html.replace(/\n+$/g, '');
+        return html;
+    }
+
+    // Конвертация Telegram HTML в Quill HTML
+    function convertTelegramToQuillHtml(html) {
+        if (!html) return '<p><br></p>';
+        html = html.replace(/<b>/g, '<strong>');
+        html = html.replace(/<\/b>/g, '</strong>');
+        html = html.replace(/<i>/g, '<em>');
+        html = html.replace(/<\/i>/g, '</em>');
+        html = html.replace(/<code>/g, '<code class="ql-code">');
+        const lines = html.split('\n');
+        const paragraphs = lines.map(line => {
+            if (line.trim() === '') return '<p><br></p>';
+            return '<p>' + line + '</p>';
+        });
+        return paragraphs.join('');
+    }
+
+    // Инициализация Quill редакторов
+    function initWysiwygEditors() {
+        if (Object.keys(editors).length > 0) return;
+
+        const editorConfigs = [
+            { id: "start_message", containerId: "start_message_editor" },
+            { id: "feedback_response_yes", containerId: "feedback_response_yes_editor" },
+            { id: "feedback_response_no", containerId: "feedback_response_no_editor" },
+        ];
+
+        editorConfigs.forEach((config) => {
+            const container = document.getElementById(config.containerId);
+            const textarea = document.getElementById(config.id);
+
+            const quill = new Quill(`#${config.containerId}`, {
+                theme: "snow",
+                modules: {
+                    toolbar: [
+                        ["bold", "italic", "underline", "strike"],
+                        ["code-block"],
+                        ["clean"],
+                    ],
+                },
+                placeholder: "Введите текст...",
+            });
+
+            editors[config.id] = quill;
+
+            quill.on("text-change", () => {
+                let html = quill.root.innerHTML;
+                html = convertQuillToTelegramHtml(html);
+                textarea.value = html;
+                updatePreview(config.id, config.id + "_preview");
+            });
+        });
+    }
+
+    // Загрузка настроек
+    async function loadSettings() {
+        try {
+            const response = await fetchWithAuth(`${BASE_URL}/api/settings`);
+            const data = await response.json();
+
+            if (data.success) {
+                const settings = data.settings;
+
+                document.getElementById("feedback_button_yes").value = settings.feedback_button_yes || "";
+                document.getElementById("feedback_button_no").value = settings.feedback_button_no || "";
+
+                // Каскадный поиск
+                document.getElementById("exact_match_threshold").value = settings.exact_match_threshold || "95";
+                document.getElementById("keyword_match_threshold").value = settings.keyword_match_threshold || "80";
+                document.getElementById("semantic_match_threshold").value = settings.semantic_match_threshold || "45";
+                document.getElementById("keyword_search_max_words").value = settings.keyword_search_max_words || "5";
+                document.getElementById("show_similarity").checked = settings.show_similarity !== "false";
+                document.getElementById("fallback_message").value = settings.fallback_message || "";
+
+                initWysiwygEditors();
+
+                if (editors["start_message"]) {
+                    const quillHtml = convertTelegramToQuillHtml(settings.start_message || "");
+                    editors["start_message"].root.innerHTML = quillHtml;
+                    const html = convertQuillToTelegramHtml(editors["start_message"].root.innerHTML);
+                    document.getElementById("start_message").value = html;
+                }
+                if (editors["feedback_response_yes"]) {
+                    const quillHtml = convertTelegramToQuillHtml(settings.feedback_response_yes || "");
+                    editors["feedback_response_yes"].root.innerHTML = quillHtml;
+                    const html = convertQuillToTelegramHtml(editors["feedback_response_yes"].root.innerHTML);
+                    document.getElementById("feedback_response_yes").value = html;
+                }
+                if (editors["feedback_response_no"]) {
+                    const quillHtml = convertTelegramToQuillHtml(settings.feedback_response_no || "");
+                    editors["feedback_response_no"].root.innerHTML = quillHtml;
+                    const html = convertQuillToTelegramHtml(editors["feedback_response_no"].root.innerHTML);
+                    document.getElementById("feedback_response_no").value = html;
+                }
+
+                updateAllPreviews();
+
+                document.getElementById("loadingIndicator").style.display = "none";
+                document.getElementById("settingsForm").style.display = "block";
+            } else {
+                showNotification("Ошибка загрузки настроек: " + data.message, "error");
+            }
+        } catch (error) {
+            showNotification("Ошибка при загрузке настроек: " + error.message, "error");
+        }
+    }
+
+    // Обновление предпросмотра
+    function updatePreview(inputId, previewId) {
+        const input = document.getElementById(inputId);
+        const preview = document.getElementById(previewId);
+        let text = input.value;
+
+        if (inputId.includes("button")) {
+            preview.textContent = text;
+            return;
+        }
+
+        text = text.replace(/\n/g, "<br>");
+        preview.innerHTML = text;
+    }
+
+    function updateAllPreviews() {
+        updatePreview("start_message", "start_message_preview");
+        updatePreview("feedback_button_yes", "feedback_button_yes_preview");
+        updatePreview("feedback_button_no", "feedback_button_no_preview");
+        updatePreview("feedback_response_yes", "feedback_response_yes_preview");
+        updatePreview("feedback_response_no", "feedback_response_no_preview");
+    }
+
+    // Обработчики для обычных input полей
+    document.addEventListener("DOMContentLoaded", () => {
+        const inputs = ["feedback_button_yes", "feedback_button_no"];
+
+        inputs.forEach((inputId) => {
+            const element = document.getElementById(inputId);
+            element.addEventListener("input", () => {
+                updatePreview(inputId, inputId + "_preview");
+            });
+        });
+    });
+
+    // Сохранение настроек
+    document.getElementById("settingsForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const settings = {
+            start_message: document.getElementById("start_message").value,
+            feedback_button_yes: document.getElementById("feedback_button_yes").value,
+            feedback_button_no: document.getElementById("feedback_button_no").value,
+            feedback_response_yes: document.getElementById("feedback_response_yes").value,
+            feedback_response_no: document.getElementById("feedback_response_no").value,
+
+            // Каскадный поиск
+            exact_match_threshold: document.getElementById("exact_match_threshold").value,
+            keyword_match_threshold: document.getElementById("keyword_match_threshold").value,
+            semantic_match_threshold: document.getElementById("semantic_match_threshold").value,
+            keyword_search_max_words: document.getElementById("keyword_search_max_words").value,
+            show_similarity: document.getElementById("show_similarity").checked ? "true" : "false",
+            fallback_message: document.getElementById("fallback_message").value,
+        };
+
+        try {
+            showNotification("Сохранение настроек...", "info");
+
+            const response = await fetchWithAuth(`${BASE_URL}/api/settings`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ settings }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showNotification("✅ Настройки успешно сохранены!", "success");
+            } else {
+                showNotification("❌ Ошибка: " + data.message, "error");
+            }
+        } catch (error) {
+            showNotification("❌ Ошибка при сохранении: " + error.message, "error");
+        }
+    });
+
+    // Сброс настроек
+    async function resetSettings() {
+        if (!confirm("Вы уверены, что хотите сбросить все настройки к значениям по умолчанию?")) {
+            return;
+        }
+
+        try {
+            showNotification("Сброс настроек...", "info");
+
+            const response = await fetchWithAuth(`${BASE_URL}/api/settings/reset`, {
+                method: "POST",
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showNotification("✅ Настройки сброшены!", "success");
+                setTimeout(() => {
+                    loadSettings();
+                }, 1000);
+            } else {
+                showNotification("❌ Ошибка: " + data.message, "error");
+            }
+        } catch (error) {
+            showNotification("❌ Ошибка при сбросе: " + error.message, "error");
+        }
+    }
+
+    // Уведомления
+    function showNotification(message, type) {
+        const notification = document.createElement("div");
+        notification.className = `fixed top-5 right-5 px-6 py-3 rounded-lg shadow-lg z-[100] text-white font-medium ${
+            type === 'success' ? 'bg-green-500' :
+            type === 'error' ? 'bg-red-500' :
+            'bg-blue-500'
+        }`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+
+        setTimeout(() => notification.remove(), 3000);
+    }
+
+    // Загружаем настройки при загрузке страницы
+    loadSettings();
+</script>
+</body>
+</html>

@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html class="light" lang="ru">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Логи запросов - Панель администратора</title>
+
+    <link href="{{ url_for('static', filename='css/output.css') }}" rel="stylesheet"/>
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+
+    <style>
+        /* Collapsible sidebar */
+        .sidebar-expanded {
+            width: 16rem;
+        }
+        .sidebar-collapsed {
+            width: 4.5rem;
+        }
+        .sidebar-collapsed .sidebar-text {
+            display: none;
+        }
+        .sidebar-text {
+            transition: opacity 0.2s ease-in-out;
+        }
+        .sidebar-collapsed .sidebar-text {
+            opacity: 0;
+        }
+        #sidebar.sidebar-collapsed > div > div:first-child > div:first-child {
+            justify-content: center !important;
+        }
+        #sidebar.sidebar-collapsed nav a {
+            justify-content: center !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+        }
+    </style>
+</head>
+
+<body class="font-display bg-background-light dark:bg-background-dark text-[#1F2937] dark:text-gray-200">
+<div class="flex min-h-screen">
+    
+    <aside id="sidebar" class="sidebar-expanded bg-white dark:bg-[#182431] border-r border-gray-200 dark:border-gray-700 p-4 transition-all duration-300">
+        <div class="flex flex-col h-full">
+            <div class="mb-6">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="bg-primary rounded-lg size-10 flex items-center justify-center flex-shrink-0">
+                        <span class="material-symbols-outlined text-white">support_agent</span>
+                    </div>
+                    <h1 class="sidebar-text text-lg font-bold text-gray-800 dark:text-white whitespace-nowrap overflow-hidden">Админ-панель</h1>
+                </div>
+                <button onclick="toggleSidebar()" class="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" title="Свернуть/развернуть меню">
+                    <span class="material-symbols-outlined text-gray-600 dark:text-gray-400 text-xl">menu</span>
+                    <span class="sidebar-text text-sm font-medium text-gray-600 dark:text-gray-400">Свернуть меню</span>
+                </button>
+            </div>
+
+            <nav class="flex flex-col gap-2 flex-grow">
+                <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors" href="{{ config.get('BASE_PATH', '') }}/admin/" title="База знаний">
+                    <span class="material-symbols-outlined text-gray-600 dark:text-gray-400 flex-shrink-0">import_contacts</span>
+                    <p class="sidebar-text text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal whitespace-nowrap overflow-hidden">База знаний</p>
+                </a>
+                <a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/20 dark:bg-primary/30 text-primary dark:text-white" href="{{ config.get('BASE_PATH', '') }}/admin/logs" title="Логи">
+                    <span class="material-symbols-outlined fill flex-shrink-0">receipt_long</span>
+                    <p class="sidebar-text text-sm font-bold leading-normal whitespace-nowrap overflow-hidden">Логи</p>
+                </a>
+                <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors" href="{{ config.get('BASE_PATH', '') }}/admin/test-periods" title="Тестирование">
+                    <span class="material-symbols-outlined text-gray-600 dark:text-gray-400 flex-shrink-0">science</span>
+                    <p class="sidebar-text text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal whitespace-nowrap overflow-hidden">Тестирование</p>
+                </a>
+                <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors" href="{{ config.get('BASE_PATH', '') }}/admin/permissions" title="Права доступа">
+                    <span class="material-symbols-outlined text-gray-600 dark:text-gray-400 flex-shrink-0">admin_panel_settings</span>
+                    <p class="sidebar-text text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal whitespace-nowrap overflow-hidden">Права доступа</p>
+                </a>
+                <a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors" href="{{ config.get('BASE_PATH', '') }}/admin/settings" title="Настройки">
+                    <span class="material-symbols-outlined text-gray-600 dark:text-gray-400 flex-shrink-0">settings</span>
+                    <p class="sidebar-text text-gray-800 dark:text-gray-200 text-sm font-medium leading-normal whitespace-nowrap overflow-hidden">Настройки</p>
+                </a>
+            </nav>
+        </div>
+    </aside>
+
+    
+    <main class="flex-1 p-6 lg:p-10">
+        <div class="max-w-7xl mx-auto">
+            
+            <div class="flex flex-wrap justify-between items-center gap-4 mb-8">
+                <div class="flex flex-col gap-1">
+                    <h1 class="text-gray-800 dark:text-white text-3xl font-bold leading-tight">Логи запросов</h1>
+                    <p class="text-gray-500 dark:text-gray-400 text-base font-normal leading-normal">Просмотр истории взаимодействия пользователей с чат-ботом.</p>
+                </div>
+                <div class="flex gap-3">
+                    
+                    <div class="relative">
+                        <button onclick="toggleColumnsDropdown()" class="flex items-center justify-center gap-2 rounded-lg h-11 px-5 bg-gray-500 text-white text-sm font-bold shadow-sm hover:bg-gray-600 transition-colors">
+                            <span class="material-symbols-outlined text-xl">view_column</span>
+                            <span class="truncate">Столбцы</span>
+                        </button>
+                        
+                        <div id="columnsDropdown" class="hidden absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                            <div class="p-3">
+                                <div class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Отображаемые столбцы:</div>
+                                <label class="flex items-center gap-2 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 px-2 rounded">
+                                    <input type="checkbox" id="col-time" onchange="toggleColumn('time')" class="w-4 h-4 text-primary rounded">
+                                    <span class="text-sm text-gray-700 dark:text-gray-300">Время</span>
+                                </label>
+                                <label class="flex items-center gap-2 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 px-2 rounded">
+                                    <input type="checkbox" id="col-user" onchange="toggleColumn('user')" class="w-4 h-4 text-primary rounded" checked>
+                                    <span class="text-sm text-gray-700 dark:text-gray-300">Пользователь</span>
+                                </label>
+                                <label class="flex items-center gap-2 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 px-2 rounded">
+                                    <input type="checkbox" id="col-platform" onchange="toggleColumn('platform')" class="w-4 h-4 text-primary rounded">
+                                    <span class="text-sm text-gray-700 dark:text-gray-300">Платформа</span>
+                                </label>
+                                <label class="flex items-center gap-2 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 px-2 rounded">
+                                    <input type="checkbox" id="col-question" onchange="toggleColumn('question')" class="w-4 h-4 text-primary rounded" checked>
+                                    <span class="text-sm text-gray-700 dark:text-gray-300">Вопрос</span>
+                                </label>
+                                <label class="flex items-center gap-2 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 px-2 rounded">
+                                    <input type="checkbox" id="col-answer" onchange="toggleColumn('answer')" class="w-4 h-4 text-primary rounded" checked>
+                                    <span class="text-sm text-gray-700 dark:text-gray-300">Ответ</span>
+                                </label>
+                                <label class="flex items-center gap-2 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 px-2 rounded">
+                                    <input type="checkbox" id="col-search_level" onchange="toggleColumn('search_level')" class="w-4 h-4 text-primary rounded" checked>
+                                    <span class="text-sm text-gray-700 dark:text-gray-300">Уровень поиска</span>
+                                </label>
+                                <label class="flex items-center gap-2 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 px-2 rounded">
+                                    <input type="checkbox" id="col-similarity" onchange="toggleColumn('similarity')" class="w-4 h-4 text-primary rounded" checked>
+                                    <span class="text-sm text-gray-700 dark:text-gray-300">Точность</span>
+                                </label>
+                                <label class="flex items-center gap-2 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 px-2 rounded">
+                                    <input type="checkbox" id="col-rating" onchange="toggleColumn('rating')" class="w-4 h-4 text-primary rounded" checked>
+                                    <span class="text-sm text-gray-700 dark:text-gray-300">Оценка</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="exportLogs()" class="flex items-center justify-center gap-2 rounded-lg h-11 px-5 bg-green-500 text-white text-sm font-bold shadow-sm hover:bg-green-600 transition-colors">
+                        <span class="material-symbols-outlined text-xl">download</span>
+                        <span class="truncate">Экспорт в CSV</span>
+                    </button>
+                </div>
+            </div>
+
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+                <div class="bg-white dark:bg-[#182431] rounded-xl shadow-md border border-gray-200 dark:border-gray-700 p-6 text-center">
+                    <h3 id="stat-total-queries" class="text-gray-800 dark:text-white text-3xl font-bold mb-1">0</h3>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">Всего запросов</p>
+                </div>
+                <div class="bg-white dark:bg-[#182431] rounded-xl shadow-md border border-gray-200 dark:border-gray-700 p-6 text-center">
+                    <h3 id="stat-avg-similarity" class="text-gray-800 dark:text-white text-3xl font-bold mb-1">0%</h3>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">Средняя схожесть</p>
+                </div>
+                <div class="bg-white dark:bg-[#182431] rounded-xl shadow-md border border-gray-200 dark:border-gray-700 p-6 text-center">
+                    <h3 id="stat-helpful-percentage" class="text-gray-800 dark:text-white text-3xl font-bold mb-1">0%</h3>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">Полезных ответов</p>
+                </div>
+                <div class="bg-white dark:bg-[#182431] rounded-xl shadow-md border border-gray-200 dark:border-gray-700 p-6 text-center">
+                    <h3 id="stat-helpful-count" class="text-green-600 dark:text-green-400 text-3xl font-bold mb-1">0</h3>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">👍 Положительных</p>
+                </div>
+                <div class="bg-white dark:bg-[#182431] rounded-xl shadow-md border border-gray-200 dark:border-gray-700 p-6 text-center">
+                    <h3 id="stat-not-helpful-count" class="text-red-600 dark:text-red-400 text-3xl font-bold mb-1">0</h3>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">👎 Отрицательных</p>
+                </div>
+                <div onclick="showNoAnswerQueries()" class="bg-white dark:bg-[#182431] rounded-xl shadow-md border-2 border-red-500 p-6 text-center cursor-pointer hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                    <h3 id="stat-no-answer-count" class="text-red-600 dark:text-red-400 text-3xl font-bold mb-1">0</h3>
+                    <p class="text-red-600 dark:text-red-400 text-sm font-semibold">❌ Без ответа</p>
+                </div>
+            </div>
+
+            <!-- RAG Statistics Card -->
+            <div id="rag-stats-section" class="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl shadow-md border border-indigo-200 dark:border-indigo-800 p-6 mb-6" style="display: none;">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="material-symbols-outlined text-3xl text-indigo-600 dark:text-indigo-400">smart_toy</span>
+                    <h2 class="text-indigo-900 dark:text-indigo-100 text-xl font-bold">RAG Generation Statistics</h2>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="text-center">
+                        <h3 id="rag-total-answers" class="text-indigo-600 dark:text-indigo-400 text-2xl font-bold mb-1">-</h3>
+                        <p class="text-gray-600 dark:text-gray-400 text-sm">Ответов с RAG</p>
+                    </div>
+                    <div class="text-center">
+                        <h3 id="rag-total-tokens" class="text-indigo-600 dark:text-indigo-400 text-2xl font-bold mb-1">-</h3>
+                        <p class="text-gray-600 dark:text-gray-400 text-sm">Всего токенов</p>
+                    </div>
+                    <div class="text-center">
+                        <h3 id="rag-success-rate" class="text-green-600 dark:text-green-400 text-2xl font-bold mb-1">-%</h3>
+                        <p class="text-gray-600 dark:text-gray-400 text-sm">Success Rate</p>
+                    </div>
+                    <div class="text-center">
+                        <h3 id="rag-avg-gen-time" class="text-indigo-600 dark:text-indigo-400 text-2xl font-bold mb-1">- ms</h3>
+                        <p class="text-gray-600 dark:text-gray-400 text-sm">Среднее время</p>
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="bg-white dark:bg-[#182431] rounded-xl shadow-md border border-gray-200 dark:border-gray-700 p-6 mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-gray-800 dark:text-white text-xl font-bold">Фильтры</h2>
+                    <div class="flex items-center gap-4">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="filter-no-answer" onchange="applyFilters()" class="w-5 h-5 text-red-600 rounded focus:ring-red-500">
+                            <span class="text-red-600 dark:text-red-400 font-semibold text-sm">Только без ответа</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="filter-show-archived" onchange="applyFilters()" class="w-5 h-5 text-gray-600 rounded focus:ring-gray-500">
+                            <span class="text-gray-600 dark:text-gray-400 font-semibold text-sm">Показать архивированные</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Поиск по тексту</label>
+                        <input type="text" id="filter-search" oninput="handleSearchInput()" class="form-input w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white" placeholder="Введите текст запроса">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Оценка</label>
+                        <select id="filter-rating" onchange="applyFilters()" class="form-select w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                            <option value="">Все</option>
+                            <option value="helpful">👍 Полезно</option>
+                            <option value="not_helpful">👎 Не помогло</option>
+                            <option value="no_rating">Без оценки</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Платформа</label>
+                        <select id="filter-platform" onchange="applyFilters()" class="form-select w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                            <option value="">Все</option>
+                            <option value="telegram">✈️ Telegram</option>
+                            <option value="bitrix24">💼 Bitrix24</option>
+                            <option value="web">🌐 Web</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Дата от</label>
+                        <input type="date" id="filter-date-from" onchange="applyFilters()" class="form-input w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Дата до</label>
+                        <input type="date" id="filter-date-to" onchange="applyFilters()" class="form-input w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="resetFilters()" class="px-5 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
+                        Сбросить фильтры
+                    </button>
+                </div>
+            </div>
+
+            
+            <div id="loading" class="text-center py-12 text-primary" style="display: none;">
+                <span class="material-symbols-outlined text-4xl animate-spin inline-block mb-2">refresh</span>
+                <p>Загрузка данных...</p>
+            </div>
+
+            <div id="no-data" class="text-center py-12 text-gray-500" style="display: none;">
+                <span class="material-symbols-outlined text-6xl mb-4 opacity-50">inbox</span>
+                <p class="text-xl">Нет данных для отображения</p>
+            </div>
+
+            
+            <div id="table-container" class="bg-white dark:bg-[#182431] rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700/50 dark:text-gray-400">
+                            <tr>
+                                <th class="px-6 py-3" data-column="time">Время</th>
+                                <th class="px-6 py-3" data-column="user">Пользователь</th>
+                                <th class="px-6 py-3" data-column="platform">Платформа</th>
+                                <th class="px-6 py-3" data-column="question">Вопрос</th>
+                                <th class="px-6 py-3" data-column="answer">Ответ</th>
+                                <th class="px-6 py-3 text-center" data-column="search_level">Уровень поиска</th>
+                                <th class="px-6 py-3 text-center" data-column="similarity">Точность</th>
+                                <th class="px-6 py-3 text-center" data-column="rating">Оценка</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-tbody">
+                        </tbody>
+                    </table>
+                </div>
+
+                
+                <div class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-[#182431] px-4 py-3 sm:px-6">
+                    <div class="flex flex-1 justify-between sm:hidden">
+                        <button onclick="changePage(currentPage - 1)" class="relative inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">Назад</button>
+                        <button onclick="changePage(currentPage + 1)" class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">Вперед</button>
+                    </div>
+                    <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                        <div>
+                            <p id="page-info" class="text-sm text-gray-700 dark:text-gray-400">Страница 1 из 1</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="prev-btn" onclick="changePage(currentPage - 1)" class="relative inline-flex items-center rounded-lg px-3 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span class="material-symbols-outlined">chevron_left</span>
+                            </button>
+                            <button id="next-btn" onclick="changePage(currentPage + 1)" class="relative inline-flex items-center rounded-lg px-3 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span class="material-symbols-outlined">chevron_right</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Template для RAG детали -->
+<template id="rag-details-template">
+    <tr class="rag-details-row bg-gray-50 dark:bg-gray-800/50">
+        <td colspan="8" class="px-6 py-4">
+            <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
+                <!-- Header -->
+                <div class="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
+                    <h4 class="text-sm font-semibold text-gray-900 dark:text-white">🤖 RAG Generation Details</h4>
+                    <button class="close-rag-details text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                        <span class="material-symbols-outlined text-sm">close</span>
+                    </button>
+                </div>
+
+                <!-- Metadata Grid -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Model</span>
+                        <p class="text-sm font-medium text-gray-900 dark:text-white rag-model">-</p>
+                    </div>
+                    <div>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Tokens (Prompt / Completion)</span>
+                        <p class="text-sm font-medium text-gray-900 dark:text-white rag-tokens">-</p>
+                    </div>
+                    <div>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">PII Detected</span>
+                        <p class="text-sm font-medium text-gray-900 dark:text-white rag-pii">-</p>
+                    </div>
+                    <div>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Generation Time</span>
+                        <p class="text-sm font-medium text-gray-900 dark:text-white rag-gen-time">-</p>
+                    </div>
+                </div>
+
+                <!-- Chunks Used -->
+                <div class="border-t border-gray-200 dark:border-gray-700 pt-3">
+                    <span class="text-xs text-gray-500 dark:text-gray-400 block mb-2">FAQ Chunks Used in Context:</span>
+                    <div class="rag-chunks space-y-1">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Error (if any) -->
+                <div class="rag-error-section hidden border-t border-gray-200 dark:border-gray-700 pt-3">
+                    <span class="text-xs text-red-600 dark:text-red-400 block mb-1">Error:</span>
+                    <p class="text-sm text-red-700 dark:text-red-500 rag-error-message">-</p>
+                </div>
+            </div>
+        </td>
+    </tr>
+</template>
+
+<script>
+    // Базовый URL для API запросов (с учетом BASE_PATH для reverse proxy)
+    const BASE_URL = '{{ config.get("BASE_PATH", "") }}/admin';
+    let currentPage = 1;
+    let totalPages = 1;
+    let currentFilters = {};
+    let similarityThreshold = 45;
+
+    // Настройки отображения столбцов (по умолчанию скрыты: time и platform)
+    let visibleColumns = JSON.parse(localStorage.getItem('logsVisibleColumns')) || {
+        time: false,
+        user: true,
+        platform: false,
+        question: true,
+        answer: true,
+        search_level: true,
+        similarity: true,
+        rating: true
+    };
+
+    // ========== ФУНКЦИИ ДЛЯ САЙДБАРА ==========
+
+    // Переключение состояния сайдбара (свернут/развернут)
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const isExpanded = sidebar.classList.contains('sidebar-expanded');
+
+        if (isExpanded) {
+            sidebar.classList.remove('sidebar-expanded');
+            sidebar.classList.add('sidebar-collapsed');
+            localStorage.setItem('sidebarState', 'collapsed');
+        } else {
+            sidebar.classList.remove('sidebar-collapsed');
+            sidebar.classList.add('sidebar-expanded');
+            localStorage.setItem('sidebarState', 'expanded');
+        }
+    }
+
+    // Восстановление состояния сайдбара при загрузке страницы
+    function restoreSidebarState() {
+        const savedState = localStorage.getItem('sidebarState');
+        if (savedState === 'collapsed') {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.remove('sidebar-expanded');
+            sidebar.classList.add('sidebar-collapsed');
+        }
+    }
+
+    // ========== КОНЕЦ ФУНКЦИЙ ДЛЯ САЙДБАРА ==========
+
+    // Загрузка данных при загрузке страницы
+    window.addEventListener("DOMContentLoaded", () => {
+        restoreSidebarState();
+        initializeColumnVisibility();
+        loadStatistics();
+        loadLogs();
+    });
+
+    // Инициализация видимости столбцов
+    function initializeColumnVisibility() {
+        Object.keys(visibleColumns).forEach(col => {
+            const checkbox = document.getElementById(`col-${col}`);
+            if (checkbox) {
+                checkbox.checked = visibleColumns[col];
+                applyColumnVisibility(col, visibleColumns[col]);
+            }
+        });
+    }
+
+    // Переключение dropdown
+    function toggleColumnsDropdown() {
+        const dropdown = document.getElementById('columnsDropdown');
+        dropdown.classList.toggle('hidden');
+    }
+
+    // Закрытие dropdown при клике вне его
+    document.addEventListener('click', function(event) {
+        const dropdown = document.getElementById('columnsDropdown');
+        const button = event.target.closest('button[onclick="toggleColumnsDropdown()"]');
+        if (!dropdown.contains(event.target) && !button) {
+            dropdown.classList.add('hidden');
+        }
+    });
+
+    // Переключение видимости столбца
+    function toggleColumn(columnName) {
+        visibleColumns[columnName] = !visibleColumns[columnName];
+        localStorage.setItem('logsVisibleColumns', JSON.stringify(visibleColumns));
+        applyColumnVisibility(columnName, visibleColumns[columnName]);
+    }
+
+    // Применение видимости столбца
+    function applyColumnVisibility(columnName, isVisible) {
+        const headers = document.querySelectorAll(`th[data-column="${columnName}"]`);
+        const cells = document.querySelectorAll(`td[data-column="${columnName}"]`);
+
+        const displayValue = isVisible ? '' : 'none';
+        headers.forEach(header => header.style.display = displayValue);
+        cells.forEach(cell => cell.style.display = displayValue);
+    }
+
+    // Переключение отображения деталей disambiguation
+    function toggleDisambiguationDetails(answerId) {
+        const detailsDiv = document.getElementById(`disambiguation-details-${answerId}`);
+        const icon = document.getElementById(`toggle-icon-${answerId}`);
+
+        if (detailsDiv && icon) {
+            detailsDiv.classList.toggle('hidden');
+            // Меняем иконку при раскрытии/сворачивании
+            if (detailsDiv.classList.contains('hidden')) {
+                icon.textContent = 'expand_more';
+            } else {
+                icon.textContent = 'expand_less';
+            }
+        }
+    }
+
+    function toggleAnswerText(answerId) {
+        const answerDiv = document.getElementById(`answer-text-${answerId}`);
+        if (answerDiv) {
+            answerDiv.classList.toggle('hidden');
+        }
+    }
+
+    // Загрузка статистики
+    async function loadStatistics() {
+        try {
+            const response = await fetchWithAuth(`${BASE_URL}/api/logs/statistics`);
+            const data = await response.json();
+
+            if (data.success) {
+                const stats = data.statistics;
+                document.getElementById("stat-total-queries").textContent = stats.total_queries || 0;
+                document.getElementById("stat-avg-similarity").textContent = (stats.avg_similarity || 0) + "%";
+                document.getElementById("stat-helpful-percentage").textContent = (stats.helpful_percentage || 0) + "%";
+                document.getElementById("stat-helpful-count").textContent = stats.helpful_count || 0;
+                document.getElementById("stat-not-helpful-count").textContent = stats.not_helpful_count || 0;
+                document.getElementById("stat-no-answer-count").textContent = stats.no_answer_count || 0;
+
+                if (stats.similarity_threshold) {
+                    similarityThreshold = stats.similarity_threshold;
+                }
+            }
+
+            // Загрузка RAG статистики
+            try {
+                const ragResponse = await fetchWithAuth(`${BASE_URL}/api/logs/rag-statistics`);
+                if (ragResponse.ok) {
+                    const ragData = await ragResponse.json();
+
+                    // Показываем секцию только если есть RAG ответы
+                    if (ragData.total_rag_answers > 0) {
+                        document.getElementById('rag-stats-section').style.display = 'block';
+                        document.getElementById('rag-total-answers').textContent = ragData.total_rag_answers;
+                        document.getElementById('rag-total-tokens').textContent = ragData.total_tokens_used.toLocaleString();
+                        document.getElementById('rag-success-rate').textContent = `${ragData.rag_success_rate}%`;
+                        document.getElementById('rag-avg-gen-time').textContent = `${ragData.avg_generation_time_ms} ms`;
+                    } else {
+                        document.getElementById('rag-stats-section').style.display = 'none';
+                    }
+                }
+            } catch (ragError) {
+                console.error('Ошибка загрузки RAG статистики:', ragError);
+                document.getElementById('rag-stats-section').style.display = 'none';
+            }
+        } catch (error) {
+            console.error("Ошибка загрузки статистики:", error);
+        }
+    }
+
+    // Загрузка логов
+    async function loadLogs(page = 1) {
+        document.getElementById("loading").style.display = "block";
+        document.getElementById("table-container").style.display = "none";
+        document.getElementById("no-data").style.display = "none";
+
+        try {
+            const params = new URLSearchParams({
+                page: page,
+                per_page: 50,
+                ...currentFilters,
+            });
+
+            const response = await fetchWithAuth(`${BASE_URL}/api/logs/list?${params}`);
+            const data = await response.json();
+
+            document.getElementById("loading").style.display = "none";
+
+            if (data.success && data.logs.length > 0) {
+                displayLogs(data.logs);
+                updatePagination(data.pagination);
+                document.getElementById("table-container").style.display = "block";
+            } else {
+                document.getElementById("no-data").style.display = "block";
+            }
+        } catch (error) {
+            console.error("Ошибка загрузки логов:", error);
+            document.getElementById("loading").style.display = "none";
+            document.getElementById("no-data").style.display = "block";
+        }
+    }
+
+    // Получить badge для уровня поиска
+    function getSearchLevelBadge(searchLevel, llmMetadata) {
+        const badges = {
+            'exact': '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300">🎯 Exact</span>',
+            'keyword': '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">🔑 Keyword</span>',
+            'semantic': '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300">🧠 Semantic</span>',
+            'disambiguation_shown': '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300">🔀 Варианты</span>',
+            'disambiguation': '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300">✅ Выбор</span>',
+            'direct': '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">📄 Direct</span>',
+            'clarification': '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300">❓ Уточнение</span>',
+            'no_answer': '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300">🚫 Не найдено</span>',
+            'none': '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300">❌ None</span>'
+        };
+
+        let badge = badges[searchLevel] || badges['none'];
+
+        // Добавляем RAG badge если есть LLM metadata
+        if (llmMetadata && llmMetadata.id) {
+            badge += ' <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300">🤖 RAG</span>';
+        }
+
+        return badge;
+    }
+
+    // Отображение логов в таблице
+    function displayLogs(logs) {
+        const tbody = document.getElementById("logs-tbody");
+        tbody.innerHTML = "";
+
+        // Найти query_id, которые имеют и 'disambiguation_shown', и 'disambiguation'
+        // Для таких запросов скрываем строку с 'disambiguation_shown' (показываем только финальный выбор)
+        const queryIdsWithBoth = new Set();
+        const queryIdToSearchLevels = {};
+
+        logs.forEach((log) => {
+            if (!queryIdToSearchLevels[log.query_id]) {
+                queryIdToSearchLevels[log.query_id] = [];
+            }
+            queryIdToSearchLevels[log.query_id].push(log.search_level);
+        });
+
+        Object.keys(queryIdToSearchLevels).forEach((queryId) => {
+            const levels = queryIdToSearchLevels[queryId];
+            if (levels.includes('disambiguation_shown') && levels.includes('disambiguation')) {
+                queryIdsWithBoth.add(parseInt(queryId));
+            }
+        });
+
+        logs.forEach((log, logIndex) => {
+            // Пропускаем строки с 'disambiguation_shown', если пользователь уже выбрал вариант
+            if (log.search_level === 'disambiguation_shown' && queryIdsWithBoth.has(log.query_id)) {
+                return; // Не показываем эту строку в таблице
+            }
+
+            const row = document.createElement("tr");
+            const uniqueId = `${log.query_id}_${log.answer_log_id || logIndex}`; // Уникальный ID для каждой строки
+
+            // Определяем "нет ответа":
+            // - 'none': ответ не найден вообще (из базы данных)
+            // - 'no_answer': RAG не нашел информации
+            // Исключаем из "нет ответа":
+            // - 'disambiguation_shown', 'disambiguation': это уточнение, не ошибка
+            // - 'clarification': RAG просит уточнить вопрос (слишком широкий запрос)
+            const isClarificationOrDisambiguation = ['disambiguation_shown', 'disambiguation', 'clarification'].includes(log.search_level);
+            const isExplicitNoAnswer = ['none', 'no_answer'].includes(log.search_level);
+            const noAnswer = (isExplicitNoAnswer || (!log.faq_id || (log.similarity_score && log.similarity_score < similarityThreshold))) && !isClarificationOrDisambiguation;
+
+            row.className = "border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors";
+            row.dataset.queryId = log.query_id;
+            row.dataset.answerLogId = log.answer_log_id || logIndex;
+
+            // Сохраняем llm_metadata в глобальное хранилище
+            if (log.llm_metadata && log.llm_metadata.id) {
+                const key = `${log.query_id}_${log.answer_log_id || logIndex}`;
+                ragMetadataStore[key] = log.llm_metadata;
+            }
+
+            if (noAnswer) {
+                row.classList.add("bg-orange-50/50", "dark:bg-orange-500/10");
+            } else {
+                row.classList.add("bg-white", "dark:bg-[#182431]");
+            }
+
+            const dateStr = log.query_timestamp + " UTC+7";
+
+            const score = log.similarity_score || 0;
+            const scoreClass = score >= 70 ? "text-green-600 dark:text-green-400" :
+                              score >= 50 ? "text-yellow-600 dark:text-yellow-400" :
+                              "text-red-600 dark:text-red-400";
+
+            let ratingHTML = '<span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">-</span>';
+            if (log.rating === "helpful") {
+                ratingHTML = '<span class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300"><span class="material-symbols-outlined text-sm fill">thumb_up</span> Полезно</span>';
+            } else if (log.rating === "not_helpful") {
+                ratingHTML = '<span class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300"><span class="material-symbols-outlined text-sm fill">thumb_down</span> Не помогло</span>';
+            }
+
+            const platform = log.platform || "telegram";
+            let platformIcon, platformText, platformClass;
+
+            if (platform === "bitrix24") {
+                platformIcon = "💼";
+                platformText = "Bitrix24";
+                platformClass = "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300";
+            } else if (platform === "web") {
+                platformIcon = "🌐";
+                platformText = "Web";
+                platformClass = "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300";
+            } else {
+                platformIcon = "✈️";
+                platformText = "Telegram";
+                platformClass = "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300";
+            }
+
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white font-medium" data-column="time">${dateStr}</td>
+                <td class="px-6 py-4" data-column="user">
+                    <div class="text-gray-900 dark:text-white font-medium">${log.username || "N/A"}</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">ID: ${log.user_id}</div>
+                </td>
+                <td class="px-6 py-4" data-column="platform">
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${platformClass}">${platformIcon} ${platformText}</span>
+                </td>
+                <td class="px-6 py-4" data-column="question">
+                    <div class="max-w-xs truncate text-gray-800 dark:text-gray-200" title="${log.query_text}">
+                        ${noAnswer ? "❌ " : ""}${log.query_text}
+                    </div>
+                </td>
+                <td class="px-6 py-4" data-column="answer">
+                    ${log.search_level === 'disambiguation_shown' ?
+                        `<div class="relative">
+                            <button onclick="toggleDisambiguationDetails('${uniqueId}')"
+                                    class="text-blue-600 dark:text-blue-400 font-semibold text-sm hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer flex items-center gap-1 transition-colors">
+                                <span>🔀 Показаны варианты для выбора</span>
+                                <span id="toggle-icon-${uniqueId}" class="material-symbols-outlined text-sm">expand_more</span>
+                            </button>
+                            <div id="disambiguation-details-${uniqueId}" class="hidden mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                                <div class="text-xs font-semibold text-blue-800 dark:text-blue-300 mb-2">Варианты:</div>
+                                <div class="text-sm text-gray-700 dark:text-gray-300 space-y-1">
+                                    ${(log.answer_shown || '').split('\n').filter(line => line.trim().startsWith('-')).map(line => {
+                                        const cleanLine = line.trim().substring(1).trim();
+                                        const escaped = cleanLine.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                        return `<div class="flex items-start gap-2">
+                                                <span class="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                                                <span>${escaped}</span>
+                                            </div>`;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        </div>` :
+                        log.faq_question ? `
+                            <div>
+                                <div class="max-w-xs truncate text-gray-800 dark:text-gray-200" title="${log.faq_question}">${log.faq_question}</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">${log.category || ""}</div>
+                                ${log.answer_shown ? `
+                                    <button onclick="toggleAnswerText('${uniqueId}')"
+                                            class="mt-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 cursor-pointer flex items-center gap-1">
+                                        <span class="material-symbols-outlined" style="font-size: 14px;">visibility</span>
+                                        <span>Показать ответ</span>
+                                    </button>
+                                    <div id="answer-text-${uniqueId}" class="hidden mt-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 max-w-md">
+                                        <div class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                            ${log.llm_metadata && log.llm_metadata.id ? '🤖 RAG Ответ:' : '📝 Ответ пользователю:'}
+                                        </div>
+                                        <div class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">${escapeHtml(log.answer_shown)}</div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        ` : log.answer_shown ? `
+                            <div>
+                                <div class="text-sm text-gray-700 dark:text-gray-300 italic">
+                                    ${log.search_level === 'clarification' ? '❓ Просьба уточнить' :
+                                      log.search_level === 'no_answer' ? '🚫 Информация не найдена' :
+                                      '❌ Ответ не найден'}
+                                </div>
+                                <button onclick="toggleAnswerText('${uniqueId}')"
+                                        class="mt-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 cursor-pointer flex items-center gap-1">
+                                    <span class="material-symbols-outlined" style="font-size: 14px;">visibility</span>
+                                    <span>Показать текст</span>
+                                </button>
+                                <div id="answer-text-${uniqueId}" class="hidden mt-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 max-w-md">
+                                    <div class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                        ${log.llm_metadata && log.llm_metadata.id ? '🤖 RAG Ответ:' : '📝 Текст ответа:'}
+                                    </div>
+                                    <div class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">${escapeHtml(log.answer_shown)}</div>
+                                </div>
+                            </div>
+                        ` : '<span class="text-red-600 dark:text-red-400 font-semibold text-sm">❌ Ответ не найден</span>'}
+                </td>
+                <td class="px-6 py-4 text-center" data-column="search_level">
+                    <div class="flex items-center justify-center gap-1">
+                        ${getSearchLevelBadge(log.search_level, log.llm_metadata)}
+                        ${log.llm_metadata && log.llm_metadata.id ? `
+                            <button onclick="toggleRagDetails(${log.query_id}, ${log.answer_log_id || logIndex})"
+                                    class="ml-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 cursor-pointer"
+                                    title="Показать RAG детали">
+                                <span class="material-symbols-outlined text-sm">info</span>
+                            </button>
+                        ` : ''}
+                    </div>
+                </td>
+                <td class="px-6 py-4 text-center" data-column="similarity">
+                    <span class="font-bold ${scoreClass}">${score.toFixed(1)}%</span>
+                </td>
+                <td class="px-6 py-4 text-center" data-column="rating">${ratingHTML}</td>
+            `;
+
+            // Применяем видимость столбцов
+            Object.keys(visibleColumns).forEach(col => {
+                const cells = row.querySelectorAll(`td[data-column="${col}"]`);
+                if (!visibleColumns[col]) {
+                    cells.forEach(cell => cell.style.display = 'none');
+                }
+            });
+
+            tbody.appendChild(row);
+        });
+    }
+
+    // Обновление пагинации
+    function updatePagination(pagination) {
+        currentPage = pagination.page;
+        totalPages = pagination.total_pages;
+
+        document.getElementById("page-info").textContent = `Страница ${currentPage} из ${totalPages} (всего: ${pagination.total})`;
+
+        document.getElementById("prev-btn").disabled = currentPage <= 1;
+        document.getElementById("next-btn").disabled = currentPage >= totalPages;
+    }
+
+    // Смена страницы
+    function changePage(page) {
+        if (page >= 1 && page <= totalPages) {
+            loadLogs(page);
+        }
+    }
+
+    // Debounce функция
+    let searchDebounceTimer;
+    function debounce(func, delay) {
+        return function () {
+            clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = setTimeout(func, delay);
+        };
+    }
+
+    const handleSearchInput = debounce(() => {
+        applyFilters();
+    }, 500);
+
+    // Применение фильтров
+    function applyFilters() {
+        currentFilters = {};
+
+        const search = document.getElementById("filter-search").value.trim();
+        if (search) currentFilters.search = search;
+
+        const rating = document.getElementById("filter-rating").value;
+        if (rating) currentFilters.rating = rating;
+
+        const platform = document.getElementById("filter-platform").value;
+        if (platform) currentFilters.platform = platform;
+
+        const dateFrom = document.getElementById("filter-date-from").value;
+        if (dateFrom) currentFilters.date_from = dateFrom;
+
+        const dateTo = document.getElementById("filter-date-to").value;
+        if (dateTo) currentFilters.date_to = dateTo;
+
+        const noAnswer = document.getElementById("filter-no-answer").checked;
+        if (noAnswer) currentFilters.no_answer = "true";
+
+        const showArchived = document.getElementById("filter-show-archived").checked;
+        if (showArchived) currentFilters.show_archived = "true";
+
+        loadLogs(1);
+        loadStatistics();
+    }
+
+    // Сброс фильтров
+    function resetFilters() {
+        document.getElementById("filter-search").value = "";
+        document.getElementById("filter-rating").value = "";
+        document.getElementById("filter-platform").value = "";
+        document.getElementById("filter-date-from").value = "";
+        document.getElementById("filter-date-to").value = "";
+        document.getElementById("filter-no-answer").checked = false;
+        document.getElementById("filter-show-archived").checked = false;
+        currentFilters = {};
+        loadLogs(1);
+        loadStatistics();
+    }
+
+    // Экспорт в CSV
+    function exportLogs() {
+        const params = new URLSearchParams(currentFilters);
+        window.location.href = `${BASE_URL}/api/logs/export?${params}`;
+    }
+
+    // Быстрый фильтр "Без ответа"
+    function showNoAnswerQueries() {
+        document.getElementById("filter-no-answer").checked = true;
+        document.getElementById("filter-search").value = "";
+        document.getElementById("filter-rating").value = "";
+        document.getElementById("filter-date-from").value = "";
+        document.getElementById("filter-date-to").value = "";
+        applyFilters();
+        document.getElementById("table-container").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    // Глобальное хранилище для LLM metadata
+    const ragMetadataStore = {};
+
+    // Toggle RAG Details
+    function toggleRagDetails(queryId, answerLogId) {
+        const detailsRowId = `rag-details-${queryId}-${answerLogId}`;
+        let existingRow = document.getElementById(detailsRowId);
+
+        // Если уже раскрыто - закрываем
+        if (existingRow) {
+            existingRow.remove();
+            return;
+        }
+
+        // Получаем llm_metadata из хранилища
+        const key = `${queryId}_${answerLogId}`;
+        const llmMetadata = ragMetadataStore[key];
+
+        if (!llmMetadata) {
+            console.error('LLM metadata not found for', key);
+            return;
+        }
+
+        // Клонируем template
+        const template = document.getElementById('rag-details-template');
+        const detailsRow = template.content.cloneNode(true);
+        const tr = detailsRow.querySelector('tr');
+        tr.id = detailsRowId;
+
+        // Заполняем данные
+        tr.querySelector('.rag-model').textContent = llmMetadata.model || 'N/A';
+        tr.querySelector('.rag-tokens').textContent =
+            `${llmMetadata.tokens.prompt} / ${llmMetadata.tokens.completion} (Total: ${llmMetadata.tokens.total})`;
+        tr.querySelector('.rag-pii').textContent = llmMetadata.pii_detected || 0;
+        tr.querySelector('.rag-gen-time').textContent = `${llmMetadata.generation_time_ms} ms`;
+
+        // Chunks
+        const chunksContainer = tr.querySelector('.rag-chunks');
+        if (llmMetadata.chunks_data && llmMetadata.chunks_data.length > 0) {
+            llmMetadata.chunks_data.forEach((chunk, idx) => {
+                const chunkDiv = document.createElement('div');
+                chunkDiv.className = 'flex items-start space-x-2 text-sm';
+                chunkDiv.innerHTML = `
+                    <span class="text-gray-400 dark:text-gray-500">${idx + 1}.</span>
+                    <span class="flex-1 text-gray-700 dark:text-gray-300">${escapeHtml(chunk.question)}</span>
+                    <span class="text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                        ${chunk.confidence.toFixed(1)}%
+                    </span>
+                `;
+                chunksContainer.appendChild(chunkDiv);
+            });
+        } else {
+            chunksContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No chunks data</p>';
+        }
+
+        // Error (if any)
+        if (llmMetadata.error_message) {
+            tr.querySelector('.rag-error-section').classList.remove('hidden');
+            tr.querySelector('.rag-error-message').textContent = llmMetadata.error_message;
+        }
+
+        // Close button
+        tr.querySelector('.close-rag-details').addEventListener('click', () => {
+            document.getElementById(detailsRowId).remove();
+        });
+
+        // Вставляем после текущей строки
+        const currentRow = document.querySelector(`tr[data-query-id="${queryId}"][data-answer-log-id="${answerLogId}"]`);
+        if (currentRow && currentRow.parentNode) {
+            currentRow.parentNode.insertBefore(tr, currentRow.nextSibling);
+        }
+    }
+
+    // Helper function для экранирования HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+</script>
+</body>
+</html>

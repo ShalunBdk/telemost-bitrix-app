@@ -1,0 +1,59 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+venv
+env
+.venv
+
+# IDEs
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+*.db
+*.log
+logs/*.log
+telemost_conferences.db
+telemost_sessions.db
+session_storage.py
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Documentation
+README.md
+QUICKSTART.md
+*.md
+
+# Tests
+tests/
+test_*.py
+*_test.py
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Node modules (if any)
+node_modules/

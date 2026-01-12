@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: telemost-bitrix-app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      # Flask settings
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY:-change-this-secret-key-in-production}
+
+      # Database
+      - DATABASE_PATH=/app/data/telemost_conferences.db
+
+      # Base path for reverse proxy (доступ через /telemost-bitrix)
+      - BASE_PATH=/telemost-bitrix
+      - SCRIPT_NAME=/telemost-bitrix
+
+      # Bitrix24 settings
+      - BITRIX24_CLIENT_ID=${BITRIX24_CLIENT_ID}
+      - BITRIX24_CLIENT_SECRET=${BITRIX24_CLIENT_SECRET}
+      - BITRIX24_WEBHOOK_URL=${BITRIX24_WEBHOOK_URL}
+
+      # Yandex Telemost settings
+      - YANDEX_CLIENT_ID=${YANDEX_CLIENT_ID}
+      - YANDEX_CLIENT_SECRET=${YANDEX_CLIENT_SECRET}
+      - YANDEX_REDIRECT_URI=${YANDEX_REDIRECT_URI:-https://it.company.ru/telemost-bitrix/auth/yandex/callback}
+      - YANDEX_OAUTH_TOKEN=${YANDEX_OAUTH_TOKEN}
+
+      # Logging
+      - LOGGING_LEVEL=${LOGGING_LEVEL:-INFO}
+
+    volumes:
+      # Постоянное хранилище для БД
+      - ./data:/app/data
+      # Логи
+      - ./logs:/app/logs
+
+    networks:
+      - app-network
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  data:
+  logs:

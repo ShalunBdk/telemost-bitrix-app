@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Установка приложения — Телемост для Битрикс24</title>
+
+  <!-- Bitrix24 JS API -->
+  <script src="//api.bitrix24.com/api/v1/"></script>
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+  <div class="max-w-md w-full bg-white rounded-lg shadow-md p-8">
+    {% if success %}
+      <div class="text-center">
+        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
+          <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <h2 class="mt-4 text-lg font-medium text-gray-900">Приложение установлено!</h2>
+        <p class="mt-2 text-gray-500">Интеграция с Яндекс Телемост успешно настроена.</p>
+        <div class="mt-6">
+          <!-- For Bitrix24 iframe apps, we need to call installFinish -->
+          <script>
+            if (typeof BX24 !== 'undefined') {
+              BX24.init(function() {
+                BX24.installFinish();
+              });
+            }
+          </script>
+          <a href="{{ url_for('index') }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+            Перейти к приложению
+          </a>
+        </div>
+      </div>
+    {% else %}
+      <div class="text-center">
+        <h2 class="text-lg font-medium text-gray-900">Установка приложения</h2>
+        <p class="mt-2 text-gray-500">Выполняется процесс установки интеграции с Яндекс Телемост.</p>
+        <div class="mt-6">
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+          <p class="mt-4 text-gray-600">Пожалуйста, подождите...</p>
+        </div>
+        <script>
+          // Try to finish installation automatically after a short delay if this is called from Bitrix24
+          setTimeout(function() {
+            if (typeof BX24 !== 'undefined') {
+              BX24.init(function() {
+                BX24.installFinish();
+              });
+            }
+          }, 2000);
+        </script>
+      </div>
+    {% endif %}
+  </div>
+</body>
+</html>

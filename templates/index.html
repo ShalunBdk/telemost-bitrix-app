@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Видеоконференции Телемост — Битрикс24</title>
+
+  <!-- Bitrix24 SDK -->
+  <script src="//api.bitrix24.com/api/v1/"></script>
+
+  <!-- Tailwind CSS (production build) -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
+
+  <!-- Vue 3 (global build) -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen p-6">
+
+  <div id="app" class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+      <div>
+        <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Видеоконференции Телемост</h1>
+        <p class="text-gray-600">Интеграция с Битрикс24</p>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <!-- Auth status indicators -->
+        <div class="flex items-center gap-2 text-sm">
+          <div :class="['w-3 h-3 rounded-full', bitrixAuth ? 'bg-green-500' : 'bg-red-500']"></div>
+          <span>Битрикс24</span>
+        </div>
+        <div class="flex items-center gap-2 text-sm">
+          <div :class="['w-3 h-3 rounded-full', telemostAuth ? 'bg-green-500' : 'bg-red-500']"></div>
+          <span>Телемост</span>
+        </div>
+
+        <!-- Auth buttons -->
+        <template v-if="!bitrixAuth">
+          <a href="/auth/bitrix24" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Подключить Битрикс24</a>
+        </template>
+
+        <!-- Create button -->
+        <template v-else>
+          <div class="relative inline-block">
+            <button @click.stop="showCreateMenu = !showCreateMenu"
+                    class="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg shadow">
+              <span class="text-lg">＋</span>
+              Создать
+              <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M6 8l4 4 4-4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+
+            <transition name="fade">
+              <div v-if="showCreateMenu" @click.stop class="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border overflow-hidden" style="z-index: 1000;">
+                <button @click="openCreateModal('conference')"
+                        class="w-full px-5 py-4 text-left hover:bg-blue-50 flex items-start gap-3 border-b">
+                  <div class="p-2 rounded-lg">
+                    <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                  </div>
+                  <div class="flex-1">
+                    <div class="font-semibold text-gray-900">Конференция</div>
+                    <div class="text-sm text-gray-500 mt-1">Интерактивная встреча</div>
+                  </div>
+                </button>
+                <button @click="openCreateModal('broadcast')"
+                        class="w-full px-5 py-4 text-left hover:bg-purple-50 flex items-start gap-3">
+                  <div class="p-2 rounded-lg">
+                    <div class="w-3 h-3 rounded-full bg-purple-500"></div>
+                  </div>
+                  <div class="flex-1">
+                    <div class="font-semibold text-gray-900">Трансляция</div>
+                    <div class="text-sm text-gray-500 mt-1">Вебинар для аудитории</div>
+                  </div>
+                </button>
+              </div>
+            </transition>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Main content area, shown if Bitrix24 is authenticated -->
+    {% raw %}
+    <template v-if="bitrixAuth">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div></div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="flex gap-2 mb-6 border-b border-gray-200 overflow-x-auto">
+        <button v-for="(t, i) in tabs" :key="i" @click="selectedTab = i"
+                :class="['flex items-center gap-2 px-5 py-3 border-b-2 whitespace-nowrap', selectedTab === i ? 'border-blue-600 text-blue-600 font-semibold' : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300']">
+          <span v-if="t.icon" class="text-base">{{ t.icon }}</span>
+          {{ t.label }}
+          <span :class="['px-2.5 py-0.5 text-xs font-medium rounded-full', selectedTab === i ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600']">
+            {{ tabCount(i) }}
+          </span>
+        </button>
+      </div>
+
+      <!-- Search -->
+      <div class="mb-6">
+        <div class="relative">
+          <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">🔎</span>
+          <input type="text" v-model="searchQuery" placeholder="Поиск по названию или владельцу..."
+                 class="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 shadow-sm" />
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="bg-white rounded-xl shadow-lg border border-gray-200">
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Название</th>
+                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Управление</th>
+                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Создано</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              <tr v-for="conf in filteredConferences" :key="conf.id" class="hover:bg-gray-50 transition-colors">
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-3">
+                    <div :class="['p-2 rounded-lg', conf.type === 'conference' ? 'bg-blue-100' : 'bg-purple-100']">
+                      <div :class="['w-3 h-3 rounded-full', conf.type === 'conference' ? 'bg-blue-500' : 'bg-purple-500']"></div>
+                    </div>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <span class="font-medium text-gray-900">{{ conf.name }}</span>
+                        <span :class="['px-2.5 py-1 text-xs font-medium rounded-full', conf.type === 'conference' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700']">
+                          {{ conf.type === 'conference' ? 'Конференция' : 'Трансляция' }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <button @click="start(conf.link)" class="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg text-sm font-medium shadow-sm">
+                      ▶️ {{ conf.type === 'conference' ? 'НАЧАТЬ' : 'ТРАНСЛЯЦИЮ' }}
+                    </button>
+
+                    <button @click="copyLink(conf.link)" class="px-4 py-2 border-2 border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium flex items-center gap-2">
+                      🔗 ССЫЛКА
+                    </button>
+
+                    <div class="relative">
+                      <button @click.stop="toggleMenu(conf.id, $event)" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">⋯</button>
+                    </div>
+                  </div>
+                </td>
+
+                <td class="px-6 py-4">
+                  {{ formatDate(conf.createdAt) }}
+                </td>
+              </tr>
+              <tr v-if="filteredConferences.length === 0">
+                <td colspan="3" class="px-6 py-6 text-center text-gray-500">
+                  <div v-if="loading">Загрузка...</div>
+                  <div v-else>Ничего не найдено</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="flex justify-between items-center mt-6 text-sm text-gray-600">
+        <div class="font-medium">Всего: <span class="text-gray-900 font-semibold">{{ filteredConferences.length }}</span></div>
+      </div>
+
+      <!-- Dropdown menu (teleported to body) -->
+      <teleport to="body">
+        <div v-if="openMenuId !== null" @click.stop
+             :style="{ position: 'fixed', top: menuPosition.top + 'px', left: menuPosition.left + 'px', zIndex: 9999 }"
+             class="w-48 bg-white rounded-lg shadow-2xl border">
+          <button @click="editFromMenu(); closeMenu()" class="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-2.5 border-b text-sm">✏️ Редактировать</button>
+          <button @click="deleteFromMenu(); closeMenu()" class="w-full px-4 py-2.5 text-left hover:bg-red-50 flex items-center gap-2.5 text-red-600 text-sm rounded-b-lg">🗑️ Удалить</button>
+        </div>
+      </teleport>
+    </template>
+
+    <!-- Auth required message -->
+    <template v-else>
+      <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">Требуется авторизация</h2>
+        <p class="text-gray-600 mb-6">Для использования приложения необходимо подключить Битрикс24:</p>
+
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+          <a href="/auth/bitrix24" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+            Авторизоваться в Битрикс24
+          </a>
+        </div>
+      </div>
+    </template>
+
+    <!-- Create Modal -->
+    <transition name="fade">
+      <div v-if="isCreateModalOpen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style="z-index: 10000;">
+        <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+          <div class="sticky top-0 bg-white p-6 border-b border-gray-200 flex justify-between items-center rounded-t-2xl">
+            <h2 class="text-2xl font-bold text-gray-900">{{ newConference.type === 'conference' ? 'Создать конференцию' : 'Создать трансляцию' }}</h2>
+            <button @click="closeModal" class="p-2 hover:bg-gray-100 rounded-lg">✖️</button>
+          </div>
+
+          <div class="p-6 space-y-6">
+            <!-- Info -->
+            <div :class="['p-4 rounded-xl flex gap-3', newConference.type === 'conference' ? 'bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-200' : 'bg-gradient-to-r from-purple-50 to-purple-100 border-2 border-purple-200']">
+              <div class="text-2xl flex-shrink-0">•</div>
+              <div>
+                <div class="font-semibold text-gray-900 mb-1">{{ newConference.type === 'conference' ? 'Видеоконференция' : 'Трансляция' }}</div>
+                <div class="text-sm text-gray-700">
+                  {{ newConference.type === 'conference' ? 'Интерактивная встреча с несколькими участниками.' : 'Односторонняя трансляция для аудитории.' }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Название -->
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Название <span class="text-red-500">*</span></label>
+              <input type="text" v-model="newConference.name" placeholder="Введите название"
+                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+            </div>
+
+            <!-- Соорганизаторы -->
+            <div class="pt-2">
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Соорганизаторы (до 30)</label>
+              <input type="text" ref="cohostInput" placeholder="email@example.com (нажмите Enter)"
+                     @keypress.enter.prevent="addCohost"
+                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+              <div class="flex flex-wrap gap-2 mt-3" v-if="newConference.cohosts.length">
+                <span v-for="(email, idx) in newConference.cohosts" :key="idx" class="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                  {{ email }}
+                  <button @click="removeCohost(idx)" class="ml-1 hover:bg-blue-200 rounded-full p-0.5">✖️</button>
+                </span>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex justify-end gap-3 pt-6 border-t-2 border-gray-100">
+              <button @click="closeModal" class="px-6 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50">Отмена</button>
+              <button @click="handleCreateConference"
+                      class="px-6 py-3 text-white rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 flex items-center gap-2 font-semibold shadow-lg">
+                {{ creatingConference ? 'Создание...' : (newConference.type === 'conference' ? 'Создать конференцию' : 'Создать трансляцию') }}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </transition>
+    {% endraw %}
+  </div>
+
+  <script>
+    const { createApp, ref, reactive, computed, onMounted } = Vue;
+
+    createApp({
+      setup() {
+        const searchQuery = ref('');
+        const selectedTab = ref(0);
+        const isCreateModalOpen = ref(false);
+        const showCreateMenu = ref(false);
+        const loading = ref(false);
+        const creatingConference = ref(false);
+        const openMenuId = ref(null);
+        const menuPosition = ref({ top: 0, left: 0 });
+        const selectedConf = ref(null);
+        const currentUser = ref(null); // Данные текущего пользователя из BX24
+        const isInitialized = ref(false); // Флаг инициализации BX24
+
+        // Get auth status from Flask template
+        const bitrixAuth = {{ bitrix_auth | tojson }};
+        const telemostAuth = {{ telemost_auth | tojson }};
+
+        const conferences = ref([
+          // Will be populated from API
+        ]);
+
+        // Функция получения текущего пользователя через BX24 SDK
+        const getCurrentUserFromBX24 = () => {
+          return new Promise((resolve, reject) => {
+            if (!window.BX24) {
+              reject(new Error('Bitrix24 SDK не доступен'));
+              return;
+            }
+
+            BX24.callMethod('user.current', {}, (result) => {
+              if (result.error()) {
+                console.error('Ошибка получения пользователя:', result.error());
+                reject(result.error());
+              } else {
+                const user = result.data();
+                resolve({
+                  id: String(user.ID),
+                  name: `${user.NAME || ''} ${user.LAST_NAME || ''}`.trim() || user.EMAIL || 'Unknown User'
+                });
+              }
+            });
+          });
+        };
+
+        // Инициализация Bitrix24 SDK
+        const initializeBX24 = async () => {
+          return new Promise((resolve) => {
+            if (!window.BX24) {
+              console.warn('Bitrix24 SDK недоступен, работаем без SDK');
+              isInitialized.value = true;
+              resolve(false);
+              return;
+            }
+
+            BX24.init(() => {
+              console.log('Bitrix24 SDK инициализирован');
+              isInitialized.value = true;
+              resolve(true);
+            });
+          });
+        };
+
+        const defaultNew = () => ({
+          type: 'conference',
+          name: '',
+          cohosts: []
+        });
+
+        const newConference = reactive(defaultNew());
+
+        const tabs = [
+          { label: 'Все', icon: null },
+          { label: 'Конференции', icon: '🎥' },
+          { label: 'Трансляции', icon: '📡' }
+        ];
+
+        const filteredConferences = computed(() => {
+          let list = conferences.value.slice();
+          if (selectedTab.value === 1) list = list.filter(c => c.type === 'conference');
+          else if (selectedTab.value === 2) list = list.filter(c => c.type === 'broadcast');
+
+          if (searchQuery.value && searchQuery.value.trim()) {
+            const q = searchQuery.value.trim().toLowerCase();
+            list = list.filter(conf =>
+              conf.name.toLowerCase().includes(q)
+            );
+          }
+          return list;
+        });
+
+        const statusColor = (status) => {
+          const m = {
+            scheduled: 'bg-blue-100 text-blue-800',
+            live: 'bg-green-100 text-green-800',
+            completed: 'bg-gray-100 text-gray-800',
+            cancelled: 'bg-red-100 text-red-800'
+          };
+          return m[status] || 'bg-gray-100 text-gray-800';
+        };
+
+        const statusText = (status) => {
+          const m = { 
+            scheduled: 'Запланирована', 
+            live: '🔴 В эфире', 
+            completed: 'Завершена', 
+            cancelled: 'Отменена' 
+          };
+          return m[status] || 'Неизвестно';
+        };
+
+        const openCreateModal = (type) => {
+          if (!telemostAuth) {
+            showToast('Для создания встреч необходимо подключить Яндекс Телемост (обратитесь к администратору)', 'error');
+            return;
+          }
+          Object.assign(newConference, defaultNew());
+          newConference.type = type;
+          isCreateModalOpen.value = true;
+          showCreateMenu.value = false;
+          closeMenu(); // Close dropdown menu if open
+        };
+
+        const closeModal = () => {
+          isCreateModalOpen.value = false;
+          Object.assign(newConference, defaultNew());
+          creatingConference.value = false;
+        };
+
+        const handleCreateConference = async () => {
+          if (!newConference.name.trim()) {
+            showToast('Пожалуйста, введите название', 'error');
+            return;
+          }
+
+          creatingConference.value = true;
+
+          try {
+            const response = await fetch(buildApiUrl('/api/conferences'), {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                type: newConference.type,
+                name: newConference.name,
+                cohosts: newConference.cohosts
+              })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+              // Add to local list and close modal
+              conferences.value.unshift({
+                id: result.id || conferences.value.length ? Math.max(...conferences.value.map(c => c.id)) + 1 : 1,
+                name: newConference.name,
+                type: newConference.type,
+                ownerId: 1,
+                link: result.link || `https://telemost.yandex.ru/j/${Math.random().toString(36).substr(2,9)}`,
+                createdAt: new Date()
+              });
+
+              closeModal();
+              showToast('Конференция успешно создана!', 'success');
+            } else {
+              // In demo mode, just add to local list if Yandex is not connected
+              if (result.connected === false) {
+                // Add to local list for demo purposes
+                conferences.value.unshift({
+                  id: conferences.value.length ? Math.max(...conferences.value.map(c => c.id)) + 1 : 1,
+                  name: newConference.name,
+                  type: newConference.type,
+                  ownerId: 1,
+                  link: `https://telemost.yandex.ru/j/${Math.random().toString(36).substr(2,9)}`,
+                  createdAt: new Date()
+                });
+
+                closeModal();
+                showToast('Конференция добавлена в демо-режиме. Для полноценного функционирования требуется подключение Яндекс Телемост.', 'warning');
+              } else {
+                showToast('Ошибка при создании конференции: ' + (result.error || 'Неизвестная ошибка'), 'error');
+              }
+            }
+          } catch (error) {
+            showToast('Ошибка при создании конференции: ' + error.message, 'error');
+          } finally {
+            creatingConference.value = false;
+          }
+        };
+
+        const copyLink = (link) => {
+          // Use fallback method for iframe compatibility (Clipboard API is blocked in iframes)
+          const textArea = document.createElement('textarea');
+          textArea.value = link;
+          textArea.style.position = 'fixed';
+          textArea.style.left = '-999999px';
+          textArea.style.top = '-999999px';
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+
+          try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+              showToast('✓ Ссылка скопирована!', 'success');
+            } else {
+              showToast('Не удалось скопировать ссылку', 'error');
+            }
+          } catch (err) {
+            console.error('Copy failed', err);
+            showToast('Не удалось скопировать ссылку: ' + err.message, 'error');
+          } finally {
+            document.body.removeChild(textArea);
+          }
+        };
+
+        const deleteConference = async (id) => {
+          if (confirm('Вы уверены, что хотите удалить?')) {
+            try {
+              const response = await fetch(buildApiUrl(`/api/conferences/${id}`), {
+                method: 'DELETE'
+              });
+
+              const result = await response.json();
+
+              if (response.ok) {
+                conferences.value = conferences.value.filter(c => c.id !== id);
+                showToast('Конференция успешно удалена!', 'success');
+              } else {
+                // If Yandex is not connected, just remove from local list
+                if (result.connected === false) {
+                  conferences.value = conferences.value.filter(c => c.id !== id);
+                  showToast('Конференция удалена в демо-режиме. Для полноценного функционирования требуется подключение Яндекс Телемост.', 'warning');
+                } else {
+                  showToast('Ошибка при удалении конференции: ' + (result.error || 'Неизвестная ошибка'), 'error');
+                }
+              }
+            } catch (error) {
+              // If there's a network error when Yandex is not connected, just remove from local list
+              if (!telemostAuth) {
+                conferences.value = conferences.value.filter(c => c.id !== id);
+                showToast('Конференция удалена в демо-режиме. Для полноценного функционирования требуется подключение Яндекс Телемост.', 'warning');
+              } else {
+                showToast('Ошибка при удалении конференции: ' + error.message, 'error');
+              }
+            }
+          }
+        };
+
+        const tabCount = (index) => {
+          if (index === 1) return conferences.value.filter(c => c.type === 'conference').length;
+          if (index === 2) return conferences.value.filter(c => c.type === 'broadcast').length;
+          return conferences.value.length;
+        };
+
+        const toggleMenu = (id, event) => {
+          if (openMenuId.value === id) {
+            closeMenu();
+            return;
+          }
+
+          openMenuId.value = id;
+
+          // Find the conference
+          selectedConf.value = conferences.value.find(c => c.id === id);
+
+          // Calculate menu position
+          const button = event.currentTarget;
+          const rect = button.getBoundingClientRect();
+
+          // Menu width (w-48 = 12rem = 192px)
+          const menuWidth = 192;
+
+          // Position menu below and to the left of the button (fixed position, no scroll offset needed)
+          let left = rect.right - menuWidth;
+
+          // If menu would go off left edge, align it to the left of button
+          if (left < 0) {
+            left = rect.left;
+          }
+
+          menuPosition.value = {
+            top: rect.bottom + 4,
+            left: left
+          };
+        };
+
+        const closeMenu = () => {
+          openMenuId.value = null;
+          selectedConf.value = null;
+        };
+
+        const editFromMenu = () => {
+          if (selectedConf.value) {
+            edit(selectedConf.value);
+          }
+        };
+
+        const deleteFromMenu = () => {
+          if (selectedConf.value) {
+            deleteConference(selectedConf.value.id);
+          }
+        };
+
+        const start = (link) => {
+          window.open(link, '_blank');
+        };
+
+        const edit = (conf) => {
+          // Fill form and open modal
+          Object.assign(newConference, defaultNew());
+          newConference.type = conf.type;
+          newConference.name = conf.name;
+          newConference.cohosts = conf.cohosts || [];
+          isCreateModalOpen.value = true;
+        };
+
+        // Cohosts management
+        const addCohost = (ev) => {
+          const el = ev.target;
+          const email = el.value && el.value.trim();
+          if (!email) return;
+          if (!email.includes('@')) {
+            showToast('Невалидный email', 'error');
+            return;
+          }
+          if (newConference.cohosts.length >= 30) {
+            showToast('Максимум 30 соорганизаторов', 'error');
+            el.value = '';
+            return;
+          }
+          newConference.cohosts.push(email);
+          el.value = '';
+        };
+        
+        const removeCohost = (idx) => {
+          newConference.cohosts.splice(idx, 1);
+        };
+
+        // Helper function to build URL with user info
+        const buildApiUrl = (path) => {
+          const url = new URL(path, window.location.origin);
+          if (currentUser.value) {
+            url.searchParams.set('user_id', currentUser.value.id);
+            url.searchParams.set('user_name', currentUser.value.name);
+          }
+          return url.toString();
+        };
+
+        // Load conferences from API or demo data
+        const loadConferences = async () => {
+          loading.value = true;
+          try {
+            if (telemostAuth) {
+              const response = await fetch(buildApiUrl('/api/conferences'));
+              if (response.ok) {
+                const data = await response.json();
+                conferences.value = Array.isArray(data) ? data : (data.conferences || []);
+              } else {
+                console.error('Failed to load conferences:', response.status);
+              }
+            } else {
+              // Load demo data for preview
+              conferences.value = [
+                { id: 1, name: 'Тестовая видеоконференция', type: 'conference', ownerId: 1, link: 'https://telemost.yandex.ru/j/demo1', createdAt: new Date() },
+                { id: 2, name: 'Презентация продукта', type: 'broadcast', ownerId: 2, link: 'https://telemost.yandex.ru/j/demo2', createdAt: new Date() },
+                { id: 3, name: 'Совещание отдела', type: 'conference', ownerId: 3, link: 'https://telemost.yandex.ru/j/demo3', createdAt: new Date() },
+                { id: 4, name: 'Вебинар по продажам', type: 'broadcast', ownerId: 2, link: 'https://telemost.yandex.ru/j/demo4', createdAt: new Date() }
+              ];
+            }
+          } catch (error) {
+            console.error('Error loading conferences:', error);
+          } finally {
+            loading.value = false;
+          }
+        };
+
+        const formatDate = (dateStr) => {
+          if (!dateStr) return '—';
+          try {
+            // Try different date formats
+            let date;
+            if (typeof dateStr === 'string') {
+              // Handle ISO format or other common formats
+              if (dateStr.includes('T')) {
+                date = new Date(dateStr);
+              } else {
+                // Handle other formats like YYYY-MM-DD HH:MM:SS
+                const parsed = Date.parse(dateStr);
+                if (!isNaN(parsed)) {
+                  date = new Date(parsed);
+                } else {
+                  // If all else fails, return original string
+                  return dateStr;
+                }
+              }
+            } else if (dateStr instanceof Date) {
+              date = dateStr;
+            } else {
+              return String(dateStr);
+            }
+
+            if (isNaN(date.getTime())) {
+              return dateStr; // return original if can't parse
+            }
+
+            // Format as DD.MM.YYYY HH:MM
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+
+            return `${day}.${month}.${year} ${hours}:${minutes}`;
+          } catch (e) {
+            // If there's an error parsing the date, return the original string
+            return dateStr;
+          }
+        };
+
+        // Toast notification function
+        const showToast = (message, type = 'info') => {
+          // Create toast container if it doesn't exist
+          let container = document.querySelector('.toast-container');
+          if (!container) {
+            container = document.createElement('div');
+            container.className = 'toast-container';
+            document.body.appendChild(container);
+          }
+
+          // Create toast element
+          const toast = document.createElement('div');
+          toast.className = `toast ${type}`;
+          toast.innerHTML = `
+            <div class="toast-content">${message}</div>
+            <button class="toast-close" onclick="this.parentElement.remove()">✕</button>
+          `;
+
+          // Add to container
+          container.appendChild(toast);
+
+          // Auto remove after 5 seconds
+          setTimeout(() => {
+            if (toast.parentElement) {
+              toast.remove();
+            }
+          }, 5000);
+        };
+
+        // Load conferences on component mount
+        onMounted(async () => {
+          // Инициализировать BX24 SDK
+          const bx24Available = await initializeBX24();
+
+          // Получить данные пользователя из BX24
+          if (bx24Available) {
+            try {
+              currentUser.value = await getCurrentUserFromBX24();
+              console.log('Текущий пользователь:', currentUser.value);
+            } catch (error) {
+              console.error('Не удалось получить пользователя из BX24:', error);
+              // Продолжаем работу без пользователя (для тестирования)
+            }
+          }
+
+          // Загрузить конференции
+          loadConferences();
+
+          // Close menus when clicking outside
+          document.addEventListener('click', (e) => {
+            if (openMenuId.value !== null) {
+              closeMenu();
+            }
+            if (showCreateMenu.value) {
+              showCreateMenu.value = false;
+            }
+          });
+
+          // Close menu when scrolling
+          window.addEventListener('scroll', () => {
+            if (openMenuId.value !== null) {
+              closeMenu();
+            }
+          }, true); // Use capture phase to catch all scroll events
+        });
+
+        return {
+          searchQuery, selectedTab, isCreateModalOpen, showCreateMenu, loading, creatingConference,
+          conferences, newConference, tabs, filteredConferences, openMenuId, menuPosition, selectedConf,
+          statusColor, statusText, openCreateModal, closeModal,
+          handleCreateConference, copyLink, deleteConference, tabCount,
+          start, edit, addCohost, removeCohost, toggleMenu, closeMenu, editFromMenu, deleteFromMenu,
+          bitrixAuth, telemostAuth, formatDate, showToast
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
