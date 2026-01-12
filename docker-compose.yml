@@ -40,7 +40,7 @@ services:
       - ./logs:/app/logs
 
     networks:
-      - app-network
+      - glpi-ssl_glpi-network
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
@@ -50,8 +50,8 @@ services:
       start_period: 40s
 
 networks:
-  app-network:
-    driver: bridge
+  glpi-ssl_glpi-network:
+    external: true
 
 volumes:
   data:
