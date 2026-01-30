@@ -35,11 +35,18 @@ def init_db():
             owner_id TEXT NOT NULL,
             owner_name TEXT NOT NULL,
             link TEXT UNIQUE,
+            watch_url TEXT,
             status TEXT DEFAULT 'scheduled',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
+    # Add watch_url column if it doesn't exist (for existing databases)
+    try:
+        cursor.execute('ALTER TABLE conferences ADD COLUMN watch_url TEXT')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     
     # Create indexes for performance
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_owner_id ON conferences(owner_id)')
@@ -86,16 +93,17 @@ def save_conference(conference_data: Dict) -> str:
         conference_data['ownerId'],  # User who created the conference
         conference_data.get('ownerName', 'Unknown'),
         conference_data.get('link', ''),
+        conference_data.get('watchUrl', ''),
         conference_data.get('status', 'scheduled')
     )
-    
+
     # Insert conference
     cursor.execute('''
         INSERT INTO conferences
         (name, type, description, start_date, start_time, cohosts,
         create_calendar_event, invite_users, live_stream_title, live_stream_description,
-        owner_id, owner_name, link, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        owner_id, owner_name, link, watch_url, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', data)
 
     conference_id = cursor.lastrowid
@@ -113,18 +121,18 @@ def get_user_conferences(owner_id: str) -> List[Dict]:
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT id, name, type, description, start_date, start_time, 
+        SELECT id, name, type, description, start_date, start_time,
                cohosts, create_calendar_event, invite_users,
                live_stream_title, live_stream_description,
-               owner_id, owner_name, link, status, created_at
-        FROM conferences 
+               owner_id, owner_name, link, watch_url, status, created_at
+        FROM conferences
         WHERE owner_id = ?
         ORDER BY created_at DESC
     ''', (owner_id,))
-    
+
     rows = cursor.fetchall()
     conn.close()
-    
+
     conferences = []
     for row in rows:
         cohosts = json.loads(row[6]) if row[6] else []
@@ -143,10 +151,11 @@ def get_user_conferences(owner_id: str) -> List[Dict]:
             'ownerId': row[11],
             'ownerName': row[12],
             'link': row[13],
-            'status': row[14],
-            'createdAt': row[15]
+            'watchUrl': row[14],
+            'status': row[15],
+            'createdAt': row[16]
         })
-    
+
     return conferences
 
 def get_all_conferences() -> List[Dict]:
@@ -155,19 +164,19 @@ def get_all_conferences() -> List[Dict]:
     """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     cursor.execute('''
-        SELECT id, name, type, description, start_date, start_time, 
+        SELECT id, name, type, description, start_date, start_time,
                cohosts, create_calendar_event, invite_users,
                live_stream_title, live_stream_description,
-               owner_id, owner_name, link, status, created_at
+               owner_id, owner_name, link, watch_url, status, created_at
         FROM conferences
         ORDER BY created_at DESC
     ''')
-    
+
     rows = cursor.fetchall()
     conn.close()
-    
+
     conferences = []
     for row in rows:
         cohosts = json.loads(row[6]) if row[6] else []
@@ -186,10 +195,11 @@ def get_all_conferences() -> List[Dict]:
             'ownerId': row[11],
             'ownerName': row[12],
             'link': row[13],
-            'status': row[14],
-            'createdAt': row[15]
+            'watchUrl': row[14],
+            'status': row[15],
+            'createdAt': row[16]
         })
-    
+
     return conferences
 
 def get_conference_by_id(conf_id: int) -> Optional[Dict]:
@@ -198,19 +208,19 @@ def get_conference_by_id(conf_id: int) -> Optional[Dict]:
     """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     cursor.execute('''
-        SELECT id, name, type, description, start_date, start_time, 
+        SELECT id, name, type, description, start_date, start_time,
                cohosts, create_calendar_event, invite_users,
                live_stream_title, live_stream_description,
-               owner_id, owner_name, link, status, created_at
+               owner_id, owner_name, link, watch_url, status, created_at
         FROM conferences
         WHERE id = ?
     ''', (conf_id,))
-    
+
     row = cursor.fetchone()
     conn.close()
-    
+
     if row:
         cohosts = json.loads(row[6]) if row[6] else []
         return {
@@ -228,10 +238,11 @@ def get_conference_by_id(conf_id: int) -> Optional[Dict]:
             'ownerId': row[11],
             'ownerName': row[12],
             'link': row[13],
-            'status': row[14],
-            'createdAt': row[15]
+            'watchUrl': row[14],
+            'status': row[15],
+            'createdAt': row[16]
         }
-    
+
     return None
 
 def update_conference(conf_id: int, conference_data: Dict) -> bool:
@@ -240,9 +251,9 @@ def update_conference(conf_id: int, conference_data: Dict) -> bool:
     """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     cohosts_str = json.dumps(conference_data.get('cohosts', []))
-    
+
     cursor.execute('''
         UPDATE conferences SET
             name = ?,
@@ -257,6 +268,7 @@ def update_conference(conf_id: int, conference_data: Dict) -> bool:
             live_stream_description = ?,
             owner_name = ?,
             link = ?,
+            watch_url = ?,
             status = ?
         WHERE id = ?
     ''', (
@@ -272,14 +284,15 @@ def update_conference(conf_id: int, conference_data: Dict) -> bool:
         conference_data.get('liveStreamDescription', ''),
         conference_data.get('ownerName', 'Unknown'),
         conference_data.get('link', ''),
+        conference_data.get('watchUrl', ''),
         conference_data.get('status', 'scheduled'),
         conf_id
     ))
-    
+
     success = cursor.rowcount > 0
     conn.commit()
     conn.close()
-    
+
     return success
 
 def delete_conference(conf_id: int) -> bool:
@@ -303,20 +316,20 @@ def get_conferences_by_type(conf_type: str) -> List[Dict]:
     """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     cursor.execute('''
-        SELECT id, name, type, description, start_date, start_time, 
+        SELECT id, name, type, description, start_date, start_time,
                cohosts, create_calendar_event, invite_users,
                live_stream_title, live_stream_description,
-               owner_id, owner_name, link, status, created_at
+               owner_id, owner_name, link, watch_url, status, created_at
         FROM conferences
         WHERE type = ?
         ORDER BY created_at DESC
     ''', (conf_type,))
-    
+
     rows = cursor.fetchall()
     conn.close()
-    
+
     conferences = []
     for row in rows:
         cohosts = json.loads(row[6]) if row[6] else []
@@ -335,10 +348,11 @@ def get_conferences_by_type(conf_type: str) -> List[Dict]:
             'ownerId': row[11],
             'ownerName': row[12],
             'link': row[13],
-            'status': row[14],
-            'createdAt': row[15]
+            'watchUrl': row[14],
+            'status': row[15],
+            'createdAt': row[16]
         })
-    
+
     return conferences
 
 # Initialize database when module is imported

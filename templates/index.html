@@ -147,6 +147,13 @@
                       🔗 ССЫЛКА
                     </button>
 
+                    <!-- Кнопка для зрителей (только для трансляций) -->
+                    <button v-if="conf.type === 'broadcast' && conf.watchUrl"
+                            @click="copyLink(conf.watchUrl)"
+                            class="px-4 py-2 border-2 border-purple-300 bg-purple-50 rounded-lg hover:bg-purple-100 text-sm font-medium flex items-center gap-2 text-purple-700">
+                      👁️ ДЛЯ ЗРИТЕЛЕЙ
+                    </button>
+
                     <div class="relative">
                       <button @click.stop="toggleMenu(conf.id, $event)" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">⋯</button>
                     </div>
@@ -203,7 +210,7 @@
       <div v-if="isCreateModalOpen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style="z-index: 10000;">
         <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
           <div class="sticky top-0 bg-white p-6 border-b border-gray-200 flex justify-between items-center rounded-t-2xl">
-            <h2 class="text-2xl font-bold text-gray-900">{{ newConference.type === 'conference' ? 'Создать конференцию' : 'Создать трансляцию' }}</h2>
+            <h2 class="text-2xl font-bold text-gray-900">{{ editingConferenceId ? (newConference.type === 'conference' ? 'Редактировать конференцию' : 'Редактировать трансляцию') : (newConference.type === 'conference' ? 'Создать конференцию' : 'Создать трансляцию') }}</h2>
             <button @click="closeModal" class="p-2 hover:bg-gray-100 rounded-lg">✖️</button>
           </div>
 
@@ -228,10 +235,28 @@
 
             <!-- Соорганизаторы -->
             <div class="pt-2">
-              <label class="block text-sm font-semibold text-gray-700 mb-2">Соорганизаторы (до 30)</label>
-              <input type="text" ref="cohostInput" placeholder="email@example.com (нажмите Enter)"
-                     @keypress.enter.prevent="addCohost"
-                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+              <label class="block text-sm font-semibold text-gray-700 mb-2">
+                {{ newConference.type === 'broadcast' ? 'Организатор трансляции' : 'Соорганизаторы (до 30)' }}
+                <span v-if="newConference.type === 'broadcast'" class="text-red-500">*</span>
+              </label>
+
+              <!-- Предупреждение для трансляций -->
+              <div v-if="newConference.type === 'broadcast'" class="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p class="text-sm text-amber-800">
+                  <strong>Важно:</strong> Укажите email вашего аккаунта Яндекса, чтобы стать организатором и иметь возможность запустить трансляцию.
+                </p>
+              </div>
+
+              <div class="flex gap-2">
+                <input type="text" v-model="cohostEmail"
+                       :placeholder="newConference.type === 'broadcast' ? 'ваш-email@yandex.ru' : 'email@example.com'"
+                       @keydown.enter.prevent="addCohost"
+                       class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                <button type="button" @click="addCohost" class="px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">
+                  Добавить
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 mt-1">Только аккаунты Яндекса (email на @yandex.ru или Яндекс 360)</p>
               <div class="flex flex-wrap gap-2 mt-3" v-if="newConference.cohosts.length">
                 <span v-for="(email, idx) in newConference.cohosts" :key="idx" class="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
                   {{ email }}
@@ -245,7 +270,7 @@
               <button @click="closeModal" class="px-6 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50">Отмена</button>
               <button @click="handleCreateConference"
                       class="px-6 py-3 text-white rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 flex items-center gap-2 font-semibold shadow-lg">
-                {{ creatingConference ? 'Создание...' : (newConference.type === 'conference' ? 'Создать конференцию' : 'Создать трансляцию') }}
+                {{ creatingConference ? (editingConferenceId ? 'Сохранение...' : 'Создание...') : (editingConferenceId ? 'Сохранить' : (newConference.type === 'conference' ? 'Создать конференцию' : 'Создать трансляцию')) }}
               </button>
             </div>
 
@@ -270,6 +295,7 @@
         const showCreateMenu = ref(false);
         const loading = ref(false);
         const creatingConference = ref(false);
+        const editingConferenceId = ref(null); // ID конференции при редактировании
         const openMenuId = ref(null);
         const menuPosition = ref({ top: 0, left: 0 });
         const selectedConf = ref(null);
@@ -380,6 +406,7 @@
           }
           Object.assign(newConference, defaultNew());
           newConference.type = type;
+          cohostEmail.value = '';
           isCreateModalOpen.value = true;
           showCreateMenu.value = false;
           closeMenu(); // Close dropdown menu if open
@@ -389,6 +416,8 @@
           isCreateModalOpen.value = false;
           Object.assign(newConference, defaultNew());
           creatingConference.value = false;
+          editingConferenceId.value = null;
+          cohostEmail.value = '';
         };
 
         const handleCreateConference = async () => {
@@ -397,11 +426,22 @@
             return;
           }
 
+          // Для трансляций требуется минимум один организатор
+          if (newConference.type === 'broadcast' && newConference.cohosts.length === 0) {
+            showToast('Для трансляции необходимо указать организатора (ваш email Яндекса)', 'error');
+            return;
+          }
+
           creatingConference.value = true;
+          const isEditing = editingConferenceId.value !== null;
 
           try {
-            const response = await fetch(buildApiUrl('/api/conferences'), {
-              method: 'POST',
+            const url = isEditing
+              ? buildApiUrl(`/api/conferences/${editingConferenceId.value}`)
+              : buildApiUrl('/api/conferences');
+
+            const response = await fetch(url, {
+              method: isEditing ? 'PUT' : 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
@@ -415,21 +455,35 @@
             const result = await response.json();
 
             if (response.ok) {
-              // Add to local list and close modal
-              conferences.value.unshift({
-                id: result.id || conferences.value.length ? Math.max(...conferences.value.map(c => c.id)) + 1 : 1,
-                name: newConference.name,
-                type: newConference.type,
-                ownerId: 1,
-                link: result.link || `https://telemost.yandex.ru/j/${Math.random().toString(36).substr(2,9)}`,
-                createdAt: new Date()
-              });
-
-              closeModal();
-              showToast('Конференция успешно создана!', 'success');
+              if (isEditing) {
+                // Update existing conference in local list
+                const index = conferences.value.findIndex(c => c.id === editingConferenceId.value);
+                if (index !== -1) {
+                  conferences.value[index] = {
+                    ...conferences.value[index],
+                    name: newConference.name,
+                    cohosts: newConference.cohosts
+                  };
+                }
+                closeModal();
+                showToast('Конференция успешно обновлена!', 'success');
+              } else {
+                // Add to local list and close modal
+                conferences.value.unshift({
+                  id: result.id || conferences.value.length ? Math.max(...conferences.value.map(c => c.id)) + 1 : 1,
+                  name: newConference.name,
+                  type: newConference.type,
+                  ownerId: 1,
+                  link: result.link || `https://telemost.yandex.ru/j/${Math.random().toString(36).substr(2,9)}`,
+                  watchUrl: result.watchUrl || '',
+                  createdAt: new Date()
+                });
+                closeModal();
+                showToast('Конференция успешно создана!', 'success');
+              }
             } else {
               // In demo mode, just add to local list if Yandex is not connected
-              if (result.connected === false) {
+              if (result.connected === false && !isEditing) {
                 // Add to local list for demo purposes
                 conferences.value.unshift({
                   id: conferences.value.length ? Math.max(...conferences.value.map(c => c.id)) + 1 : 1,
@@ -443,7 +497,7 @@
                 closeModal();
                 showToast('Конференция добавлена в демо-режиме. Для полноценного функционирования требуется подключение Яндекс Телемост.', 'warning');
               } else {
-                showToast('Ошибка при создании конференции: ' + (result.error || 'Неизвестная ошибка'), 'error');
+                showToast(`Ошибка при ${isEditing ? 'обновлении' : 'создании'} конференции: ` + (result.error || 'Неизвестная ошибка'), 'error');
               }
             }
           } catch (error) {
@@ -572,32 +626,39 @@
         };
 
         const edit = (conf) => {
-          // Fill form and open modal
+          // Fill form and open modal in edit mode
           Object.assign(newConference, defaultNew());
           newConference.type = conf.type;
           newConference.name = conf.name;
-          newConference.cohosts = conf.cohosts || [];
+          newConference.cohosts = Array.isArray(conf.cohosts) ? [...conf.cohosts] : [];
+          editingConferenceId.value = conf.id;
+          cohostEmail.value = '';
           isCreateModalOpen.value = true;
         };
 
         // Cohosts management
-        const addCohost = (ev) => {
-          const el = ev.target;
-          const email = el.value && el.value.trim();
+        const cohostEmail = ref('');
+
+        const addCohost = () => {
+          const email = cohostEmail.value.trim();
           if (!email) return;
           if (!email.includes('@')) {
             showToast('Невалидный email', 'error');
             return;
           }
+          if (newConference.cohosts.includes(email)) {
+            showToast('Этот email уже добавлен', 'error');
+            return;
+          }
           if (newConference.cohosts.length >= 30) {
             showToast('Максимум 30 соорганизаторов', 'error');
-            el.value = '';
+            cohostEmail.value = '';
             return;
           }
           newConference.cohosts.push(email);
-          el.value = '';
+          cohostEmail.value = '';
         };
-        
+
         const removeCohost = (idx) => {
           newConference.cohosts.splice(idx, 1);
         };
@@ -754,10 +815,10 @@
         return {
           searchQuery, selectedTab, isCreateModalOpen, showCreateMenu, loading, creatingConference,
           conferences, newConference, tabs, filteredConferences, openMenuId, menuPosition, selectedConf,
-          statusColor, statusText, openCreateModal, closeModal,
+          statusColor, statusText, openCreateModal, closeModal, editingConferenceId,
           handleCreateConference, copyLink, deleteConference, tabCount,
           start, edit, addCohost, removeCohost, toggleMenu, closeMenu, editFromMenu, deleteFromMenu,
-          bitrixAuth, telemostAuth, formatDate, showToast
+          bitrixAuth, telemostAuth, formatDate, showToast, cohostEmail
         };
       }
     }).mount('#app');

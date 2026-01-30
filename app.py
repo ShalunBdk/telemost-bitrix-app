@@ -10,7 +10,7 @@ from urllib.parse import parse_qs
 # Import the database functions
 from database import (
     save_conference, get_user_conferences, get_all_conferences,
-    get_conference_by_id, update_conference, delete_conference,
+    get_conference_by_id, update_conference as db_update_conference, delete_conference as db_delete_conference,
     get_conferences_by_type
 )
 
@@ -507,6 +507,7 @@ def create_app():
                         'status': 'scheduled',
                         # Use the actual link from Yandex API response
                         'link': result.get('link', result.get('LINK', f"https://telemost.yandex.ru/j/{result.get('id', result.get('ID', len(get_user_conferences(user_id)) + 1))}")),
+                        'watchUrl': result.get('watchUrl', ''),
                         'id': result.get('id', result.get('ID', len(get_user_conferences(user_id)) + 1))
                     }
 
@@ -551,11 +552,11 @@ def create_app():
                 return jsonify({'error': f'Failed to save conference: {str(e)}'}), 500
     
     @app.route('/api/conferences/<int:conf_id>', methods=['DELETE'])
-    def delete_conference(conf_id):
+    def delete_conference_route(conf_id):
         """Delete a conference only from our database (Yandex Telemost doesn't have delete API)"""
         # Delete from local database only (there's no API for deleting conferences in Yandex Telemost)
         try:
-            success = delete_conference(conf_id)  # Using function from database module
+            success = db_delete_conference(conf_id)
             if success:
                 return jsonify({'success': True, 'message': 'Conference deleted successfully'})
             else:
@@ -564,7 +565,7 @@ def create_app():
             return jsonify({'error': f'Failed to delete conference: {str(e)}'}), 500
 
     @app.route('/api/conferences/<int:conf_id>', methods=['PUT'])
-    def update_conference(conf_id):
+    def update_conference_route(conf_id):
         """Update a conference in database and in Yandex if token available"""
         data = request.get_json()
 
@@ -590,7 +591,7 @@ def create_app():
 
         # Update local database
         try:
-            success = update_conference(conf_id, data)
+            success = db_update_conference(conf_id, data)
             if success:
                 updated_conf = get_conference_by_id(conf_id)
                 return jsonify(updated_conf)

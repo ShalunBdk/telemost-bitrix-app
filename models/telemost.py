@@ -124,17 +124,25 @@ class TelemostAPI:
 
                     # Add live stream if this is a broadcast
                     if data and data.get('type') == 'broadcast':
+                        # Use conference name as live stream title if no specific title provided
+                        stream_title = data.get('liveStreamTitle') or data.get('live_stream_title') or data.get('name', '')
                         yandex_format_data['live_stream'] = {
-                            'title': data.get('liveStreamTitle', data.get('live_stream_title', '')),
+                            'title': stream_title,
                             'description': data.get('liveStreamDescription', data.get('live_stream_description', ''))
                         }
 
                     # Add cohosts if provided
-                    cohosts_data = data.get('cohosts', data.get('cohosts', []))
+                    cohosts_data = data.get('cohosts', []) if data else []
+                    current_app.logger.info(f"Input data: {data}")
+                    current_app.logger.info(f"Cohosts from request: {cohosts_data}")
                     if cohosts_data:
                         yandex_format_data['cohosts'] = [{'email': email} for email in cohosts_data if '@' in email]
+                        current_app.logger.info(f"Formatted cohosts for Yandex: {yandex_format_data.get('cohosts', [])}")
 
+                    current_app.logger.info(f"Sending to Yandex API: {yandex_format_data}")
                     response = requests.post(url, headers=headers, json=yandex_format_data, params=params)
+                    current_app.logger.info(f"Yandex API response status: {response.status_code}")
+                    current_app.logger.info(f"Yandex API response body: {response.text}")
                 else:
                     response = requests.post(url, headers=headers, json=data, params=params)
             elif method.upper() == 'PUT':
@@ -164,6 +172,10 @@ class TelemostAPI:
                         # Result should contain conference information including the join link
                         yandex_conf_data = result
 
+                        # Extract watch_url from live_stream if present (for broadcasts)
+                        live_stream_data = yandex_conf_data.get('live_stream', {})
+                        watch_url = live_stream_data.get('watch_url', '') if live_stream_data else ''
+
                         # Transform Yandex response to our expected format
                         conf_data = {
                             'id': yandex_conf_data.get('id', yandex_conf_data.get('ID')),
@@ -179,6 +191,7 @@ class TelemostAPI:
                             'liveStreamDescription': data.get('liveStreamDescription', '') if data else yandex_conf_data.get('live_stream_description', ''),
                             'status': 'scheduled',
                             'link': yandex_conf_data.get('link', yandex_conf_data.get('JOIN_URL', yandex_conf_data.get('join_url', f"https://telemost.yandex.ru/j/{yandex_conf_data.get('id', yandex_conf_data.get('ID', 'new'))}"))),
+                            'watchUrl': watch_url,
                             'createdAt': datetime.now().isoformat()
                         }
 
