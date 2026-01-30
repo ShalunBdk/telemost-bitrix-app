@@ -469,10 +469,13 @@
                 showToast('Конференция успешно обновлена!', 'success');
               } else {
                 // Add to local list and close modal
+                // Use result.id from server, or generate a fallback ID
+                const newId = result.id || (conferences.value.length > 0 ? Math.max(...conferences.value.map(c => Number(c.id) || 0)) + 1 : 1);
                 conferences.value.unshift({
-                  id: result.id || conferences.value.length ? Math.max(...conferences.value.map(c => c.id)) + 1 : 1,
+                  id: newId,
                   name: newConference.name,
                   type: newConference.type,
+                  cohosts: newConference.cohosts,
                   ownerId: 1,
                   link: result.link || `https://telemost.yandex.ru/j/${Math.random().toString(36).substr(2,9)}`,
                   watchUrl: result.watchUrl || '',
@@ -485,10 +488,12 @@
               // In demo mode, just add to local list if Yandex is not connected
               if (result.connected === false && !isEditing) {
                 // Add to local list for demo purposes
+                const demoId = conferences.value.length > 0 ? Math.max(...conferences.value.map(c => Number(c.id) || 0)) + 1 : 1;
                 conferences.value.unshift({
-                  id: conferences.value.length ? Math.max(...conferences.value.map(c => c.id)) + 1 : 1,
+                  id: demoId,
                   name: newConference.name,
                   type: newConference.type,
+                  cohosts: newConference.cohosts,
                   ownerId: 1,
                   link: `https://telemost.yandex.ru/j/${Math.random().toString(36).substr(2,9)}`,
                   createdAt: new Date()
